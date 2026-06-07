@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d12">
+  <title>Spending</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --panel: #161a23;
+      --panel-2: #1f2533;
+      --line: #2a3142;
+      --text: #e8ecf3;
+      --muted: #8a93a6;
+      --accent: #5b9cff;
+      --good: #4ade80;
+      --bad: #f87171;
+      --warn: #fbbf24;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overscroll-behavior-y: contain;
+    }
+    header {
+      position: sticky; top: 0; z-index: 10;
+      background: var(--bg);
+      padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px;
+      border-bottom: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px;
+    }
+    h1 { font-size: 18px; margin: 0; font-weight: 600; }
+    button {
+      font: inherit; color: inherit; background: var(--panel);
+      border: 1px solid var(--line); border-radius: 8px;
+      padding: 8px 12px; cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.primary { background: var(--accent); color: white; border-color: var(--accent); }
+    nav.tabs {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      background: var(--bg); border-bottom: 1px solid var(--line);
+      position: sticky; top: 0; z-index: 9;
+    }
+    nav.tabs button {
+      background: transparent; border: none; border-radius: 0;
+      padding: 12px 8px; color: var(--muted); font-size: 13px;
+      border-bottom: 2px solid transparent;
+    }
+    nav.tabs button.active {
+      color: var(--text); border-bottom-color: var(--accent);
+    }
+    main { padding: 16px; padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
+    section { display: none; }
+    section.active { display: block; }
+    .card {
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 12px; padding: 14px; margin-bottom: 12px;
+    }
+    .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+    .stat-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+    }
+    .stat { background: var(--panel-2); padding: 10px; border-radius: 8px; }
+    .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-value { font-size: 20px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .stat-value.good { color: var(--good); }
+    .stat-value.bad { color: var(--bad); }
+    .month-list { display: flex; flex-direction: column; gap: 8px; }
+    .month-row {
+      display: grid; grid-template-columns: 1fr auto;
+      gap: 10px; align-items: center;
+      padding: 10px 12px; background: var(--panel-2);
+      border-radius: 8px; cursor: pointer; border: 1px solid transparent;
+    }
+    .month-row.selected { border-color: var(--accent); }
+    .month-row .name { font-weight: 500; }
+    .month-row .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .month-row .amount { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .month-row .amount.good { color: var(--good); }
+    .month-row .amount.bad { color: var(--bad); }
+    .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; gap: 12px; }
+    .row:last-child { border-bottom: none; }
+    .row .label { color: var(--muted); }
+    .row span:last-child, .row strong:last-child { font-variant-numeric: tabular-nums; }
+    canvas { max-width: 100%; }
+    .slider-row { display: flex; gap: 10px; align-items: center; margin: 8px 0; }
+    .slider-row input[type=range] { flex: 1; }
+    .slider-row .val { width: 86px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+    .debt-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .debt-table th, .debt-table td { padding: 6px 4px; text-align: right; border-bottom: 1px solid var(--line); }
+    .debt-table th:first-child, .debt-table td:first-child { text-align: left; }
+    .debt-table input { width: 64px; background: var(--panel-2); border: 1px solid var(--line); color: var(--text); padding: 4px; border-radius: 4px; text-align: right; font: inherit; font-variant-numeric: tabular-nums; }
+    .modal {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      display: none; align-items: flex-end; justify-content: center;
+      z-index: 100;
+    }
+    .modal.open { display: flex; }
+    .modal-panel {
+      background: var(--bg); width: 100%; max-width: 480px;
+      max-height: 92vh; overflow-y: auto;
+      border-radius: 16px 16px 0 0; padding: 18px;
+      padding-bottom: calc(18px + env(safe-area-inset-bottom));
+    }
+    .modal h2 { margin: 0 0 12px; font-size: 18px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin-top: 10px; }
+    input[type=text], input[type=number] {
+      width: 100%; background: var(--panel-2); border: 1px solid var(--line);
+      color: var(--text); padding: 10px; border-radius: 8px;
+      font: inherit; margin-top: 4px;
+    }
+    .line-item {
+      display: grid; grid-template-columns: 1fr 110px;
+      gap: 8px; align-items: center; padding: 4px 0;
+      font-size: 14px;
+    }
+    .line-item input { margin-top: 0; padding: 6px 8px; }
+    .toggle { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
+    .toggle input { width: 18px; height: 18px; }
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--panel-2); border: 1px solid var(--line);
+      padding: 12px 18px; border-radius: 8px; z-index: 200;
+      opacity: 0; transition: opacity 0.2s; max-width: 90vw;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+    .loading {
+      text-align: center; padding: 30px; color: var(--muted);
+    }
+    .err { color: var(--bad); padding: 10px; font-size: 14px; line-height: 1.5; }
+    .legend { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Spending</h1>
+    <button id="new-month-btn" class="primary">+ New month</button>
+  </header>
+  <nav class="tabs">
+    <button data-tab="overview" class="active">Overview</button>
+    <button data-tab="monthly">Monthly</button>
+    <button data-tab="debt">Debt</button>
+    <button data-tab="trends">Trends</button>
+  </nav>
+  <main>
+    <section id="overview" class="active">
+      <div id="overview-content" class="loading">Loading…</div>
+    </section>
+    <section id="monthly">
+      <div id="monthly-content" class="loading">Loading…</div>
+    </section>
+    <section id="debt">
+      <div id="debt-content"></div>
+    </section>
+    <section id="trends">
+      <div id="trends-content" class="loading">Loading…</div>
+    </section>
+  </main>
+  <div id="modal-new-month" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-panel">
+      <h2>Create new month</h2>
+      <div id="new-month-body"></div>
+    </div>
+  </div>
+  <div id="toast" class="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script>
+    // ============================================================
+    // CONFIGURATION  (Step 5 of SETUP_GUIDE)
+    // ============================================================
+    const SPREADSHEET_ID = '1Ca646hLsA4eZOHWf0eXITGnEmhOapd7XTAqaCnElCEM';
+    const API_KEY        = 'PASTE_YOUR_API_KEY_HERE';
+    const CLIENT_ID      = 'PASTE_YOUR_OAUTH_CLIENT_ID_HERE';
+    const SCOPES         = 'https://www.googleapis.com/auth/spreadsheets';
+
+    // Sheet layout (Template tab). Rows are 1-indexed and inclusive.
+    const LAYOUT = {
+      income:   { labelCol: 'C', amountCol: 'D', rows: [2, 6] },
+      main:     { labelCol: 'C', amountCol: 'D', rows: [11, 32] },
+      optional: { labelCol: 'F', amountCol: 'G', rows: [11, 13] },
+      savings:  { labelCol: 'I', amountCol: 'J', rows: [11, 17] },
+      car:      { labelCol: 'L', amountCol: 'M', rows: [11, 17] },
+    };
+
+    // Default debt values from the SETUP_GUIDE reference table.
+    const DEFAULT_DEBTS = [
+      { name: 'Monzo loan',  balance: 16337, monthly: 408, apr: 24 },
+      { name: 'Flex',        balance: 2682,  monthly: 140, apr: 24 },
+      { name: 'Yonder',      balance: 4006,  monthly: 185, apr: 28 },
+      { name: 'Capital One', balance: 601,   monthly: 23,  apr: 28 },
+    ];
+    const SKIP_TABS = new Set(['Template', 'Debt', 'Debts', 'Notes', 'Summary']);
+
+    // ============================================================
+    // STATE
+    // ============================================================
+    let months = [];
+    let tokenClient = null;
+    let chartInstances = {};
+    let selectedMonthIdx = -1;
+
+    // ============================================================
+    // UTILS
+    // ============================================================
+    const $ = (sel) => document.querySelector(sel);
+    const fmt = (n) => {
+      const r = Math.round(n || 0);
+      return (r < 0 ? '-£' : '£') + Math.abs(r).toLocaleString('en-GB');
+    };
+    const fmt2 = (n) => {
+      const v = n || 0;
+      return (v < 0 ? '-£' : '£') + Math.abs(v).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+    const MONTHS_MAP = { JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11 };
+    const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    function parseMonth(name) {
+      const m = String(name).trim().toUpperCase().match(/^([A-Z]{3})\s+(\d{4})$/);
+      if (!m || MONTHS_MAP[m[1]] === undefined) return null;
+      return new Date(+m[2], MONTHS_MAP[m[1]], 1);
+    }
+    function showToast(msg, ms = 2500) {
+      const t = $('#toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => t.classList.remove('show'), ms);
+    }
+    function num(v) {
+      if (typeof v === 'number') return v;
+      if (v == null || v === '') return 0;
+      const n = parseFloat(String(v).replace(/[^\d.\-]/g, ''));
+      return isNaN(n) ? 0 : n;
+    }
+    function colIdx(letter) {
+      return letter.split('').reduce((a, c) => a * 26 + (c.charCodeAt(0) - 64), 0) - 1;
+    }
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    // ============================================================
+    // LOAD FROM SHEET
+    // ============================================================
+    async function loadMonths() {
+      try {
+        if (API_KEY.startsWith('PASTE_')) {
+          $('#overview-content').innerHTML = `<div class="err">Set <code>API_KEY</code> in index.html (see SETUP_GUIDE).</div>`;
+          $('#monthly-content').innerHTML = '';
+          $('#trends-content').innerHTML = '';
+          return;
+        }
+        const metaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?key=${API_KEY}&fields=sheets.properties(sheetId,title)`;
+        const metaRes = await fetch(metaUrl);
+        if (!metaRes.ok) throw new Error('Sheet metadata HTTP ' + metaRes.status);
+        const meta = await metaRes.json();
+        const sheetNames = meta.sheets.map(s => s.properties.title);
+        const monthNames = sheetNames.filter(n => !SKIP_TABS.has(n) && parseMonth(n));
+        if (!monthNames.length) {
+          $('#overview-content').innerHTML = '<div class="err">No month tabs found. Add one named like "JUL 2026" to your sheet.</div>';
+          $('#monthly-content').innerHTML = '';
+          $('#trends-content').innerHTML = '';
+          return;
+        }
+        const ranges = monthNames.map(n => `'${n.replace(/'/g, "''")}'!A1:N40`);
+        const valUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchGet?key=${API_KEY}&valueRenderOption=UNFORMATTED_VALUE&` +
+          ranges.map(r => 'ranges=' + encodeURIComponent(r)).join('&');
+        const valRes = await fetch(valUrl);
+        if (!valRes.ok) throw new Error('Sheet values HTTP ' + valRes.status);
+        const val = await valRes.json();
+        months = val.valueRanges.map((vr, i) => parseMonthData(monthNames[i], vr.values || []));
+        months.sort((a, b) => a.dateKey - b.dateKey);
+        renderAll();
+      } catch (e) {
+        console.error(e);
+        $('#overview-content').innerHTML =
+          `<div class="err">Couldn't load sheet: ${escapeHtml(e.message)}.<br>Check <code>API_KEY</code> and that the sheet is shared "Anyone with the link can view".</div>`;
+      }
+    }
+
+    function readSection(grid, sec) {
+      const lc = colIdx(sec.labelCol), ac = colIdx(sec.amountCol);
+      const items = [];
+      for (let r = sec.rows[0] - 1; r <= sec.rows[1] - 1; r++) {
+        const row = grid[r] || [];
+        const label = String(row[lc] || '').trim();
+        const amount = num(row[ac]);
+        if (label || amount) items.push({ label, amount });
+      }
+      const total = items.reduce((s, x) => s + x.amount, 0);
+      return { items, total };
+    }
+    function parseMonthData(name, grid) {
+      const income   = readSection(grid, LAYOUT.income);
+      const main     = readSection(grid, LAYOUT.main);
+      const optional = readSection(grid, LAYOUT.optional);
+      const savings  = readSection(grid, LAYOUT.savings);
+      const car      = readSection(grid, LAYOUT.car);
+      const spendTotal = main.total + optional.total + savings.total + car.total;
+      return {
+        name,
+        dateKey: parseMonth(name),
+        income: income.total,
+        main: main.total, optional: optional.total, savings: savings.total, car: car.total,
+        spendTotal, surplus: income.total - spendTotal,
+        incomeLines: income.items, mainLines: main.items,
+        optionalLines: optional.items, savingsLines: savings.items, carLines: car.items,
+      };
+    }
+
+    // ============================================================
+    // RENDER
+    // ============================================================
+    function renderAll() {
+      renderOverview();
+      renderMonthly();
+      renderTrends();
+      // Debt renders independently (doesn't need sheet)
+    }
+
+    function destroyChart(key) {
+      if (chartInstances[key]) { chartInstances[key].destroy(); delete chartInstances[key]; }
+    }
+
+    function chartOpts(extra = {}) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#e8ecf3', font: { size: 11 } } } },
+        scales: {
+          x: { ticks: { color: '#8a93a6' }, grid: { color: '#2a3142' }, stacked: !!extra.stacked },
+          y: { ticks: { color: '#8a93a6', callback: v => '£' + v.toLocaleString('en-GB') }, grid: { color: '#2a3142' }, stacked: !!extra.stacked, beginAtZero: true },
+        },
+      };
+    }
+
+    function renderOverview() {
+      const n = months.length;
+      const avg = (k) => n ? months.reduce((s, m) => s + m[k], 0) / n : 0;
+      const avgIncome = avg('income'), avgSpend = avg('spendTotal'), avgSurplus = avg('surplus');
+      const latest = months[months.length - 1];
+      $('#overview-content').innerHTML = `
+        <div class="card">
+          <h2>Averages (${n} month${n===1?'':'s'})</h2>
+          <div class="stat-grid">
+            <div class="stat"><div class="stat-label">Avg income</div><div class="stat-value">${fmt(avgIncome)}</div></div>
+            <div class="stat"><div class="stat-label">Avg spending</div><div class="stat-value">${fmt(avgSpend)}</div></div>
+            <div class="stat"><div class="stat-label">Avg surplus</div><div class="stat-value ${avgSurplus>=0?'good':'bad'}">${fmt(avgSurplus)}</div></div>
+            <div class="stat"><div class="stat-label">Latest</div><div class="stat-value">${latest ? latest.name : '—'}</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Income vs spending</h2>
+          <div style="height:220px"><canvas id="chart-incspend"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Category breakdown — ${latest ? latest.name : '—'}</h2>
+          <div style="height:240px"><canvas id="chart-cats"></canvas></div>
+        </div>
+      `;
+      destroyChart('incspend'); destroyChart('cats');
+      const labels = months.map(m => m.name);
+      chartInstances.incspend = new Chart($('#chart-incspend'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Income', data: months.map(m => m.income), backgroundColor: '#4ade80' },
+            { label: 'Spending', data: months.map(m => m.spendTotal), backgroundColor: '#f87171' },
+          ],
+        },
+        options: chartOpts(),
+      });
+      if (latest) {
+        chartInstances.cats = new Chart($('#chart-cats'), {
+          type: 'doughnut',
+          data: {
+            labels: ['Main', 'Optional', 'Savings', 'Car'],
+            datasets: [{
+              data: [latest.main, latest.optional, latest.savings, latest.car],
+              backgroundColor: ['#5b9cff','#fbbf24','#4ade80','#a78bfa'],
+              borderColor: '#161a23', borderWidth: 2,
+            }],
+          },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#e8ecf3', font: { size: 11 } } } } },
+        });
+      }
+    }
+
+    function renderMonthly() {
+      if (selectedMonthIdx < 0 || selectedMonthIdx >= months.length) selectedMonthIdx = months.length - 1;
+      $('#monthly-content').innerHTML = `
+        <div class="card">
+          <h2>Months</h2>
+          <div class="month-list">
+            ${months.map((m, i) => `
+              <div class="month-row ${i===selectedMonthIdx?'selected':''}" data-i="${i}">
+                <div>
+                  <div class="name">${escapeHtml(m.name)}</div>
+                  <div class="sub">${fmt(m.income)} in · ${fmt(m.spendTotal)} out</div>
+                </div>
+                <div class="amount ${m.surplus>=0?'good':'bad'}">${m.surplus>=0?'+':''}${fmt(m.surplus)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <div id="monthly-detail"></div>
+      `;
+      $('#monthly-content').querySelectorAll('.month-row').forEach(el => {
+        el.addEventListener('click', () => { selectedMonthIdx = +el.dataset.i; renderMonthly(); });
+      });
+      renderMonthlyDetail();
+    }
+    function renderMonthlyDetail() {
+      const m = months[selectedMonthIdx];
+      if (!m) return;
+      const lineList = (items) => items.length
+        ? items.map(it => `<div class="row"><span class="label">${escapeHtml(it.label || '—')}</span><span>${fmt2(it.amount)}</span></div>`).join('')
+        : '<div class="row"><span class="label">— none —</span><span></span></div>';
+      $('#monthly-detail').innerHTML = `
+        <div class="card">
+          <h2>${escapeHtml(m.name)} — split</h2>
+          <div style="height:220px"><canvas id="chart-month"></canvas></div>
+        </div>
+        <div class="card"><h2>Income</h2>${lineList(m.incomeLines)}
+          <div class="row"><strong>Total</strong><strong>${fmt2(m.income)}</strong></div></div>
+        <div class="card"><h2>Main spending</h2>${lineList(m.mainLines)}
+          <div class="row"><strong>Total</strong><strong>${fmt2(m.main)}</strong></div></div>
+        <div class="card"><h2>Optional</h2>${lineList(m.optionalLines)}
+          <div class="row"><strong>Total</strong><strong>${fmt2(m.optional)}</strong></div></div>
+        <div class="card"><h2>Savings</h2>${lineList(m.savingsLines)}
+          <div class="row"><strong>Total</strong><strong>${fmt2(m.savings)}</strong></div></div>
+        ${m.car > 0 ? `<div class="card"><h2>Car</h2>${lineList(m.carLines)}
+          <div class="row"><strong>Total</strong><strong>${fmt2(m.car)}</strong></div></div>` : ''}
+        <div class="card"><h2>Summary</h2>
+          <div class="row"><span class="label">Income</span><span>${fmt2(m.income)}</span></div>
+          <div class="row"><span class="label">Spending</span><span>${fmt2(m.spendTotal)}</span></div>
+          <div class="row"><strong>Surplus</strong><strong style="color:${m.surplus>=0?'var(--good)':'var(--bad)'}">${fmt2(m.surplus)}</strong></div>
+        </div>
+      `;
+      destroyChart('month');
+      chartInstances.month = new Chart($('#chart-month'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Main','Optional','Savings','Car'],
+          datasets: [{
+            data: [m.main, m.optional, m.savings, m.car],
+            backgroundColor: ['#5b9cff','#fbbf24','#4ade80','#a78bfa'],
+            borderColor: '#161a23', borderWidth: 2,
+          }],
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#e8ecf3', font: { size: 11 } } } } },
+      });
+    }
+
+    // ============================================================
+    // DEBT
+    // ============================================================
+    function loadDebts() {
+      try {
+        const saved = localStorage.getItem('debts');
+        if (!saved) return DEFAULT_DEBTS.map(d => ({...d}));
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) && parsed.length ? parsed : DEFAULT_DEBTS.map(d => ({...d}));
+      } catch { return DEFAULT_DEBTS.map(d => ({...d})); }
+    }
+    function saveDebts(d) { localStorage.setItem('debts', JSON.stringify(d)); }
+    function loadExtra() { return +(localStorage.getItem('extraPayment') || 0); }
+    function saveExtra(v) { localStorage.setItem('extraPayment', String(v)); }
+
+    function avalanche(debts, extra) {
+      let d = debts.map(x => ({ balance: +x.balance, monthly: +x.monthly, apr: +x.apr })).filter(x => x.balance > 0);
+      let interest = 0, mo = 0;
+      const schedule = [{ month: 0, remaining: d.reduce((s, x) => s + x.balance, 0) }];
+      const MAX = 600;
+      while (d.some(x => x.balance > 0) && mo < MAX) {
+        let pool = extra;
+        for (const x of d) {
+          const accr = x.balance * (x.apr / 100) / 12;
+          interest += accr;
+          x.balance += accr;
+          const pay = Math.min(x.monthly, x.balance);
+          x.balance -= pay;
+          pool += Math.max(0, x.monthly - pay);
+        }
+        const sorted = [...d].sort((a, b) => b.apr - a.apr);
+        for (const x of sorted) {
+          if (pool <= 0) break;
+          if (x.balance <= 0) continue;
+          const p = Math.min(pool, x.balance);
+          x.balance -= p; pool -= p;
+        }
+        d = d.filter(x => x.balance > 0.005);
+        mo++;
+        schedule.push({ month: mo, remaining: d.reduce((s, x) => s + x.balance, 0) });
+      }
+      return { months: mo, totalInterest: interest, schedule };
+    }
+
+    function renderDebt() {
+      const debts = loadDebts();
+      const extra = loadExtra();
+      const baseline = avalanche(debts, 0);
+      const withExtra = avalanche(debts, extra);
+      const saved = baseline.totalInterest - withExtra.totalInterest;
+      const totalBal = debts.reduce((s, x) => s + x.balance, 0);
+      const totalMin = debts.reduce((s, x) => s + x.monthly, 0);
+      $('#debt-content').innerHTML = `
+        <div class="card">
+          <h2>Debt summary</h2>
+          <div class="stat-grid">
+            <div class="stat"><div class="stat-label">Total balance</div><div class="stat-value">${fmt(totalBal)}</div></div>
+            <div class="stat"><div class="stat-label">Total monthly</div><div class="stat-value">${fmt(totalMin)}</div></div>
+            <div class="stat"><div class="stat-label">Debt-free in</div><div class="stat-value">${withExtra.months} mo</div></div>
+            <div class="stat"><div class="stat-label">Interest saved</div><div class="stat-value ${saved>0?'good':''}">${fmt(saved)}</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Extra payment</h2>
+          <div class="slider-row">
+            <input type="range" id="extra-slider" min="0" max="1000" step="10" value="${extra}">
+            <div class="val">+${fmt(extra)}/mo</div>
+          </div>
+          <div class="legend">Baseline: ${baseline.months} mo · ${fmt(baseline.totalInterest)} interest<br>
+            With extra: ${withExtra.months} mo · ${fmt(withExtra.totalInterest)} interest</div>
+        </div>
+        <div class="card">
+          <h2>Debts (edit APRs &amp; balances)</h2>
+          <table class="debt-table">
+            <thead><tr><th>Name</th><th>Balance</th><th>Monthly</th><th>APR %</th></tr></thead>
+            <tbody>
+              ${debts.map((x, i) => `
+                <tr>
+                  <td>${escapeHtml(x.name)}</td>
+                  <td><input type="number" data-f="balance" data-i="${i}" value="${x.balance}" step="1"></td>
+                  <td><input type="number" data-f="monthly" data-i="${i}" value="${x.monthly}" step="1"></td>
+                  <td><input type="number" data-f="apr"     data-i="${i}" value="${x.apr}"     step="0.1"></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="legend">Changes are saved on this device only.</div>
+        </div>
+        <div class="card">
+          <h2>Payoff projection</h2>
+          <div style="height:220px"><canvas id="chart-payoff"></canvas></div>
+        </div>
+      `;
+      $('#extra-slider').addEventListener('input', (e) => {
+        saveExtra(+e.target.value);
+        renderDebt();
+      });
+      $('#debt-content').querySelectorAll('input[data-f]').forEach(inp => {
+        inp.addEventListener('change', () => {
+          const d = loadDebts();
+          const i = +inp.dataset.i;
+          d[i][inp.dataset.f] = +inp.value || 0;
+          saveDebts(d);
+          renderDebt();
+        });
+      });
+      destroyChart('payoff');
+      const maxLen = Math.max(baseline.schedule.length, withExtra.schedule.length);
+      chartInstances.payoff = new Chart($('#chart-payoff'), {
+        type: 'line',
+        data: {
+          labels: Array.from({length: maxLen}, (_, i) => i),
+          datasets: [
+            { label: 'Baseline', data: baseline.schedule.map(s => s.remaining), borderColor: '#f87171', backgroundColor: 'rgba(248,113,113,0.1)', tension: 0.2, pointRadius: 0 },
+            { label: `+${fmt(extra)}/mo`, data: withExtra.schedule.map(s => s.remaining), borderColor: '#4ade80', backgroundColor: 'rgba(74,222,128,0.1)', tension: 0.2, pointRadius: 0 },
+          ],
+        },
+        options: chartOpts(),
+      });
+    }
+
+    // ============================================================
+    // TRENDS
+    // ============================================================
+    function renderTrends() {
+      $('#trends-content').innerHTML = `
+        <div class="card">
+          <h2>Surplus / deficit</h2>
+          <div style="height:220px"><canvas id="chart-surplus"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Necessary expenses</h2>
+          <div style="height:220px"><canvas id="chart-nec"></canvas></div>
+          <div class="legend">Main spending + savings (+ car if active)</div>
+        </div>
+        <div class="card">
+          <h2>Cumulative savings</h2>
+          <div style="height:220px"><canvas id="chart-cum"></canvas></div>
+        </div>
+      `;
+      if (!months.length) return;
+      const labels = months.map(m => m.name);
+      const surplus = months.map(m => m.surplus);
+      destroyChart('surplus'); destroyChart('nec'); destroyChart('cum');
+      chartInstances.surplus = new Chart($('#chart-surplus'), {
+        type: 'bar',
+        data: { labels, datasets: [{
+          label: 'Surplus', data: surplus,
+          backgroundColor: surplus.map(v => v >= 0 ? '#4ade80' : '#f87171'),
+        }] },
+        options: chartOpts(),
+      });
+      chartInstances.nec = new Chart($('#chart-nec'), {
+        type: 'bar',
+        data: { labels, datasets: [
+          { label: 'Main',    data: months.map(m => m.main),    backgroundColor: '#5b9cff', stack: 's' },
+          { label: 'Savings', data: months.map(m => m.savings), backgroundColor: '#4ade80', stack: 's' },
+          { label: 'Car',     data: months.map(m => m.car),     backgroundColor: '#a78bfa', stack: 's' },
+        ] },
+        options: chartOpts({ stacked: true }),
+      });
+      let cum = 0;
+      const cumData = months.map(m => (cum += m.savings));
+      chartInstances.cum = new Chart($('#chart-cum'), {
+        type: 'line',
+        data: { labels, datasets: [{
+          label: 'Cumulative savings', data: cumData,
+          borderColor: '#4ade80', backgroundColor: 'rgba(74,222,128,0.15)',
+          tension: 0.2, fill: true, pointRadius: 3,
+        }] },
+        options: chartOpts(),
+      });
+    }
+
+    // ============================================================
+    // TABS
+    // ============================================================
+    document.querySelectorAll('nav.tabs button').forEach(b => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('nav.tabs button').forEach(x => x.classList.toggle('active', x === b));
+        const id = b.dataset.tab;
+        document.querySelectorAll('main section').forEach(s => s.classList.toggle('active', s.id === id));
+      });
+    });
+
+    // ============================================================
+    // NEW MONTH (OAuth + write)
+    // ============================================================
+    function initTokenClient() {
+      if (tokenClient) return tokenClient;
+      if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return null;
+      try {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: CLIENT_ID,
+          scope: SCOPES,
+          callback: () => {},
+        });
+      } catch (e) { console.error(e); }
+      return tokenClient;
+    }
+    function getAccessToken() {
+      return new Promise((resolve, reject) => {
+        const tc = initTokenClient();
+        if (!tc) return reject(new Error('Google sign-in not loaded yet — try again in a second'));
+        tc.callback = (resp) => {
+          if (resp.error) return reject(new Error(resp.error));
+          resolve(resp.access_token);
+        };
+        try { tc.requestAccessToken({ prompt: '' }); }
+        catch (e) { reject(e); }
+      });
+    }
+
+    $('#new-month-btn').addEventListener('click', openNewMonth);
+
+    function openNewMonth() {
+      if (CLIENT_ID.startsWith('PASTE_')) {
+        showToast('Set CLIENT_ID in index.html first (SETUP_GUIDE step 4–5)', 4000);
+        return;
+      }
+      const seed = months[months.length - 1];
+      const today = new Date();
+      const defaultName = MONTH_NAMES[today.getMonth()] + ' ' + today.getFullYear();
+      const lineRows = (items, key) => items.length ? items.map((it, i) =>
+        `<div class="line-item">
+          <span>${escapeHtml(it.label || '(unlabeled)')}</span>
+          <input type="number" step="0.01" data-section="${key}" data-i="${i}" value="0" inputmode="decimal">
+        </div>`).join('') : '<div class="legend">No items in template.</div>';
+
+      $('#new-month-body').innerHTML = `
+        <label>Month name</label>
+        <input type="text" id="nm-name" value="${escapeHtml(defaultName)}" autocomplete="off">
+        ${seed ? `
+          <div class="card" style="margin-top:14px"><h2>Main spending</h2>${lineRows(seed.mainLines, 'main')}</div>
+          <div class="card"><h2>Optional</h2>${lineRows(seed.optionalLines, 'optional')}</div>
+          <div class="card"><h2>Savings</h2>${lineRows(seed.savingsLines, 'savings')}</div>
+          <div class="toggle"><input type="checkbox" id="nm-car"><label for="nm-car" style="margin:0">Include Car this month</label></div>
+          <div class="card" id="nm-car-card" style="display:none"><h2>Car</h2>${lineRows(seed.carLines, 'car')}</div>
+        ` : `<div class="err">No existing month to copy labels from. Open your sheet and create one manually first.</div>`}
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button id="nm-cancel" style="flex:1">Cancel</button>
+          <button id="nm-create" class="primary" style="flex:1" ${seed?'':'disabled'}>Create month</button>
+        </div>
+      `;
+      $('#modal-new-month').classList.add('open');
+      const carToggle = $('#nm-car');
+      if (carToggle) carToggle.addEventListener('change', () => {
+        $('#nm-car-card').style.display = carToggle.checked ? '' : 'none';
+      });
+      $('#nm-cancel').addEventListener('click', () => $('#modal-new-month').classList.remove('open'));
+      if (seed) $('#nm-create').addEventListener('click', createMonth);
+    }
+
+    async function createMonth() {
+      const btn = $('#nm-create');
+      btn.disabled = true; btn.textContent = 'Working…';
+      try {
+        const newName = $('#nm-name').value.trim();
+        if (!newName) throw new Error('Month name required');
+        if (months.some(m => m.name === newName)) throw new Error('A month with that name already exists');
+
+        const collect = (key) => Array.from(document.querySelectorAll(`#new-month-body input[data-section="${key}"]`))
+          .map(i => +i.value || 0);
+        const mainAmts = collect('main');
+        const optAmts  = collect('optional');
+        const savAmts  = collect('savings');
+        const carAmts  = $('#nm-car') && $('#nm-car').checked ? collect('car') : null;
+
+        const token = await getAccessToken();
+        const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?key=${API_KEY}&fields=sheets.properties(sheetId,title)`);
+        if (!metaRes.ok) throw new Error('Sheet metadata HTTP ' + metaRes.status);
+        const meta = await metaRes.json();
+        const template = meta.sheets.find(s => s.properties.title === 'Template');
+        if (!template) throw new Error('"Template" tab not found in spreadsheet');
+
+        const dupRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requests: [{
+            duplicateSheet: { sourceSheetId: template.properties.sheetId, newSheetName: newName, insertSheetIndex: 1 }
+          }] }),
+        });
+        if (!dupRes.ok) {
+          const t = await dupRes.text();
+          throw new Error('Duplicate failed: ' + t);
+        }
+
+        const data = [];
+        const pushRange = (col, startRow, amounts) => {
+          if (!amounts || !amounts.length) return;
+          data.push({
+            range: `'${newName.replace(/'/g, "''")}'!${col}${startRow}:${col}${startRow + amounts.length - 1}`,
+            values: amounts.map(v => [v]),
+          });
+        };
+        pushRange('D', 11, mainAmts);
+        pushRange('G', 11, optAmts);
+        pushRange('J', 11, savAmts);
+        if (carAmts) pushRange('M', 11, carAmts);
+
+        if (data.length) {
+          const upRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchUpdate`, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ valueInputOption: 'USER_ENTERED', data }),
+          });
+          if (!upRes.ok) {
+            const t = await upRes.text();
+            throw new Error('Write failed: ' + t);
+          }
+        }
+        $('#modal-new-month').classList.remove('open');
+        showToast('Created ' + newName);
+        await loadMonths();
+      } catch (e) {
+        console.error(e);
+        showToast('Error: ' + e.message, 5000);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Create month';
+      }
+    }
+
+    // ============================================================
+    // SERVICE WORKER
+    // ============================================================
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+
+    // ============================================================
+    // BOOT
+    // ============================================================
+    renderDebt();
+    loadMonths();
+  </script>
+</body>
+</html>
