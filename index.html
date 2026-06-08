@@ -28,7 +28,6 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       -webkit-font-smoothing: antialiased;
       overscroll-behavior-y: contain;
-      touch-action: pan-y;
     }
     /* === Pull to refresh === */
     #ptr {
@@ -339,25 +338,27 @@
     .leg-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 
     /* === Slider === */
-    .slider-row { display: flex; gap: 10px; align-items: center; margin: 12px 0 8px; }
+    .slider-row { display: flex; gap: 12px; align-items: center; margin: 14px 0 8px; }
     .slider-row input[type=range] {
-      flex: 1; height: 36px; -webkit-appearance: none; appearance: none;
-      background: transparent;
+      flex: 1; height: 44px; -webkit-appearance: none; appearance: none;
+      background: transparent; padding: 0; margin: 0;
+      touch-action: pan-x; cursor: pointer;
     }
     .slider-row input[type=range]::-webkit-slider-runnable-track {
-      height: 4px; background: var(--line); border-radius: 2px;
+      height: 6px; background: var(--line); border-radius: 3px;
     }
     .slider-row input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none; appearance: none;
-      width: 22px; height: 22px; border-radius: 50%;
-      background: var(--accent); margin-top: -9px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--accent); margin-top: -11px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      border: 2px solid white;
     }
     .slider-row input[type=range]::-moz-range-track {
-      height: 4px; background: var(--line); border-radius: 2px;
+      height: 6px; background: var(--line); border-radius: 3px;
     }
     .slider-row input[type=range]::-moz-range-thumb {
-      width: 22px; height: 22px; border: 0; border-radius: 50%;
+      width: 28px; height: 28px; border: 2px solid white; border-radius: 50%;
       background: var(--accent);
     }
     .slider-row .val {
@@ -1614,6 +1615,11 @@
       window.addEventListener('touchstart', (e) => {
         if (refreshing) return;
         if (window.scrollY > 0) { pulling = false; return; }
+        // Don't intercept touches that start on form controls (slider, inputs, buttons)
+        const t = e.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'BUTTON' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) {
+          pulling = false; return;
+        }
         startY = e.touches[0].clientY;
         pulling = true;
         pull = 0;
