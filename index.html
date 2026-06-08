@@ -193,6 +193,8 @@
       savings:  { labelCol: 'I', amountCol: 'J', rows: [11, 17] },
       car:      { labelCol: 'L', amountCol: 'M', rows: [11, 17] },
     };
+    // Loan row: J20 = =Debt!C7 (total monthly debt payment)
+    const LOAN_CELL = { col: 'J', row: 20 };
 
     // Default debt values from the SETUP_GUIDE reference table.
     const DEFAULT_DEBTS = [
@@ -225,10 +227,15 @@
     };
     const MONTHS_MAP = { JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11 };
     const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    // Tabs without a year suffix (e.g. "JUN") are assumed to be this year.
+    const NO_YEAR_DEFAULT = 2025;
     function parseMonth(name) {
-      const m = String(name).trim().toUpperCase().match(/^([A-Z]{3})\s+(\d{4})$/);
-      if (!m || MONTHS_MAP[m[1]] === undefined) return null;
-      return new Date(+m[2], MONTHS_MAP[m[1]], 1);
+      const u = String(name).trim().toUpperCase();
+      let m = u.match(/^([A-Z]{3})\s+(\d{4})$/);
+      if (m && MONTHS_MAP[m[1]] !== undefined) return new Date(+m[2], MONTHS_MAP[m[1]], 1);
+      m = u.match(/^([A-Z]{3})$/);
+      if (m && MONTHS_MAP[m[1]] !== undefined) return new Date(NO_YEAR_DEFAULT, MONTHS_MAP[m[1]], 1);
+      return null;
     }
     function showToast(msg, ms = 2500) {
       const t = $('#toast');
@@ -301,18 +308,23 @@
       const total = items.reduce((s, x) => s + x.amount, 0);
       return { items, total };
     }
+    function cellAt(grid, col, row) {
+      const r = grid[row - 1]; if (!r) return 0;
+      return num(r[colIdx(col)]);
+    }
     function parseMonthData(name, grid) {
       const income   = readSection(grid, LAYOUT.income);
       const main     = readSection(grid, LAYOUT.main);
       const optional = readSection(grid, LAYOUT.optional);
       const savings  = readSection(grid, LAYOUT.savings);
       const car      = readSection(grid, LAYOUT.car);
-      const spendTotal = main.total + optional.total + savings.total + car.total;
+      const loan     = cellAt(grid, LOAN_CELL.col, LOAN_CELL.row);
+      const spendTotal = main.total + optional.total + savings.total + car.total + loan;
       return {
         name,
         dateKey: parseMonth(name),
         income: income.total,
-        main: main.total, optional: optional.total, savings: savings.total, car: car.total,
+        main: main.total, optional: optional.total, savings: savings.total, car: car.total, loan,
         spendTotal, surplus: income.total - spendTotal,
         incomeLines: income.items, mainLines: main.items,
         optionalLines: optional.items, savingsLines: savings.items, carLines: car.items,
@@ -386,10 +398,10 @@
         chartInstances.cats = new Chart($('#chart-cats'), {
           type: 'doughnut',
           data: {
-            labels: ['Main', 'Optional', 'Savings', 'Car'],
+            labels: ['Main', 'Optional', 'Savings', 'Debt', 'Car'],
             datasets: [{
-              data: [latest.main, latest.optional, latest.savings, latest.car],
-              backgroundColor: ['#5b9cff','#fbbf24','#4ade80','#a78bfa'],
+              data: [latest.main, latest.optional, latest.savings, latest.loan, latest.car],
+              backgroundColor: ['#5b9cff','#fbbf24','#4ade80','#f87171','#a78bfa'],
               borderColor: '#161a23', borderWidth: 2,
             }],
           },
@@ -408,7 +420,7 @@
               <div class="month-row ${i===selectedMonthIdx?'selected':''}" data-i="${i}">
                 <div>
                   <div class="name">${escapeHtml(m.name)}</div>
-                  <div class="sub">${fmt(m.income)} in · ${fmt(m.spendTotal)} out</div>
+                  <div class="sub">${fmt(m.income)} in · ${fmt(m.spendTotal)} out${m.loan>0 ? ' (incl. ' + fmt(m.loan) + ' debt)' : ''}</div>
                 </div>
                 <div class="amount ${m.surplus>=0?'good':'bad'}">${m.surplus>=0?'+':''}${fmt(m.surplus)}</div>
               </div>
@@ -441,22 +453,24 @@
           <div class="row"><strong>Total</strong><strong>${fmt2(m.optional)}</strong></div></div>
         <div class="card"><h2>Savings</h2>${lineList(m.savingsLines)}
           <div class="row"><strong>Total</strong><strong>${fmt2(m.savings)}</strong></div></div>
+        ${m.loan > 0 ? `<div class="card"><h2>Debt (Loan)</h2>
+          <div class="row"><span class="label">Monthly debt payment</span><span>${fmt2(m.loan)}</span></div></div>` : ''}
         ${m.car > 0 ? `<div class="card"><h2>Car</h2>${lineList(m.carLines)}
           <div class="row"><strong>Total</strong><strong>${fmt2(m.car)}</strong></div></div>` : ''}
         <div class="card"><h2>Summary</h2>
           <div class="row"><span class="label">Income</span><span>${fmt2(m.income)}</span></div>
           <div class="row"><span class="label">Spending</span><span>${fmt2(m.spendTotal)}</span></div>
-          <div class="row"><strong>Surplus</strong><strong style="color:${m.surplus>=0?'var(--good)':'var(--bad)'}">${fmt2(m.surplus)}</strong></div>
+          <div class="row"><strong>Remaining</strong><strong style="color:${m.surplus>=0?'var(--good)':'var(--bad)'}">${fmt2(m.surplus)}</strong></div>
         </div>
       `;
       destroyChart('month');
       chartInstances.month = new Chart($('#chart-month'), {
         type: 'doughnut',
         data: {
-          labels: ['Main','Optional','Savings','Car'],
+          labels: ['Main','Optional','Savings','Debt','Car'],
           datasets: [{
-            data: [m.main, m.optional, m.savings, m.car],
-            backgroundColor: ['#5b9cff','#fbbf24','#4ade80','#a78bfa'],
+            data: [m.main, m.optional, m.savings, m.loan, m.car],
+            backgroundColor: ['#5b9cff','#fbbf24','#4ade80','#f87171','#a78bfa'],
             borderColor: '#161a23', borderWidth: 2,
           }],
         },
@@ -597,7 +611,7 @@
         <div class="card">
           <h2>Necessary expenses</h2>
           <div style="height:220px"><canvas id="chart-nec"></canvas></div>
-          <div class="legend">Main spending + savings (+ car if active)</div>
+          <div class="legend">Main + Debt + Savings (+ Car if active)</div>
         </div>
         <div class="card">
           <h2>Cumulative savings</h2>
@@ -620,6 +634,7 @@
         type: 'bar',
         data: { labels, datasets: [
           { label: 'Main',    data: months.map(m => m.main),    backgroundColor: '#5b9cff', stack: 's' },
+          { label: 'Debt',    data: months.map(m => m.loan),    backgroundColor: '#f87171', stack: 's' },
           { label: 'Savings', data: months.map(m => m.savings), backgroundColor: '#4ade80', stack: 's' },
           { label: 'Car',     data: months.map(m => m.car),     backgroundColor: '#a78bfa', stack: 's' },
         ] },
