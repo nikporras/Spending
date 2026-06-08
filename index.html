@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#0b0d12">
   <title>Spending</title>
   <link rel="manifest" href="manifest.json">
@@ -19,74 +19,108 @@
       --good: #4ade80;
       --bad: #f87171;
       --warn: #fbbf24;
+      --purple: #a78bfa;
     }
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body {
       margin: 0; padding: 0;
       background: var(--bg); color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       -webkit-font-smoothing: antialiased;
       overscroll-behavior-y: contain;
+      touch-action: pan-y;
     }
+    /* === Pull to refresh === */
+    #ptr {
+      position: fixed; top: 0; left: 0; right: 0;
+      height: 0; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted); font-size: 12px;
+      transition: height 0.18s, opacity 0.18s;
+      opacity: 0; z-index: 50;
+      background: var(--bg);
+    }
+    #ptr .ptr-arrow {
+      display: inline-block; transition: transform 0.2s;
+      margin-right: 6px; font-size: 16px;
+    }
+    #ptr.ready .ptr-arrow { transform: rotate(180deg); color: var(--accent); }
+    #ptr.loading .ptr-arrow {
+      animation: spin 0.8s linear infinite;
+      border: 2px solid var(--accent); border-top-color: transparent;
+      border-radius: 50%; width: 16px; height: 16px;
+      font-size: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* === Header === */
     header {
       position: sticky; top: 0; z-index: 10;
       background: var(--bg);
       padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px;
       border-bottom: 1px solid var(--line);
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 10px;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
     }
     h1 { font-size: 18px; margin: 0; font-weight: 600; }
+
+    /* === Buttons === */
     button {
       font: inherit; color: inherit; background: var(--panel);
-      border: 1px solid var(--line); border-radius: 8px;
-      padding: 8px 12px; cursor: pointer;
+      border: 1px solid var(--line); border-radius: 10px;
+      padding: 10px 14px; cursor: pointer;
+      min-height: 44px;
+      transition: transform 0.08s ease, background 0.15s, border-color 0.15s;
     }
+    button:active { transform: scale(0.97); }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
-    button.primary { background: var(--accent); color: white; border-color: var(--accent); }
-    nav.tabs {
-      display: grid; grid-template-columns: repeat(4, 1fr);
-      background: var(--bg); border-bottom: 1px solid var(--line);
-      position: sticky; top: 0; z-index: 9;
+    button.primary { background: var(--accent); color: white; border-color: var(--accent); font-weight: 500; }
+
+    /* === Main === */
+    main {
+      padding: 16px;
+      padding-bottom: calc(72px + env(safe-area-inset-bottom));
+      min-height: calc(100vh - 60px);
     }
-    nav.tabs button {
-      background: transparent; border: none; border-radius: 0;
-      padding: 12px 8px; color: var(--muted); font-size: 13px;
-      border-bottom: 2px solid transparent;
-    }
-    nav.tabs button.active {
-      color: var(--text); border-bottom-color: var(--accent);
-    }
-    main { padding: 16px; padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
     section { display: none; }
-    section.active { display: block; }
+    section.active {
+      display: block;
+      animation: fadeSlideIn 0.20s ease-out;
+    }
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* === Cards === */
     .card {
       background: var(--panel); border: 1px solid var(--line);
-      border-radius: 12px; padding: 14px; margin-bottom: 12px;
+      border-radius: 14px; padding: 14px; margin-bottom: 12px;
     }
-    .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
-      color: var(--muted); margin: 0 0 10px; font-weight: 600; }
-    .stat-grid {
-      display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+    .card h2 {
+      font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--muted); margin: 0 0 10px; font-weight: 600;
     }
-    .stat { background: var(--panel-2); padding: 10px; border-radius: 8px; }
+
+    /* === Stat grid === */
+    .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .stat { background: var(--panel-2); padding: 12px; border-radius: 10px; }
     .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
     .stat-value { font-size: 20px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
     .stat-value.good { color: var(--good); }
     .stat-value.bad { color: var(--bad); }
+
+    /* === Year tabs & month grid === */
     .year-tabs {
       display: flex; gap: 8px; margin-bottom: 12px;
       overflow-x: auto; -webkit-overflow-scrolling: touch;
       padding-bottom: 4px;
     }
     .year-tabs button {
-      padding: 8px 16px; background: var(--panel); color: var(--muted);
+      padding: 10px 18px; background: var(--panel); color: var(--muted);
       border: 1px solid var(--line); border-radius: 999px; font-size: 14px;
-      font-weight: 500; white-space: nowrap; flex-shrink: 0;
+      font-weight: 500; white-space: nowrap; flex-shrink: 0; min-height: 40px;
     }
-    .year-tabs button.active {
-      background: var(--accent); color: white; border-color: var(--accent);
-    }
+    .year-tabs button.active { background: var(--accent); color: white; border-color: var(--accent); }
     .month-grid {
       display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
       margin-bottom: 16px;
@@ -94,55 +128,111 @@
     .month-chip {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       padding: 14px 4px; background: var(--panel); border: 1px solid var(--line);
-      border-radius: 10px; gap: 4px; min-height: 64px;
+      border-radius: 12px; gap: 4px; min-height: 64px;
     }
     .month-chip.selected { border-color: var(--accent); background: var(--panel-2); }
     .month-chip .m { font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: 0.5px; }
     .month-chip .s { font-size: 11px; font-variant-numeric: tabular-nums; }
     .month-chip.good .s { color: var(--good); }
     .month-chip.bad .s { color: var(--bad); }
-    .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; gap: 12px; }
+
+    /* === Rows === */
+    .row {
+      display: flex; justify-content: space-between; padding: 8px 0;
+      border-bottom: 1px solid var(--line); font-size: 14px; gap: 12px;
+    }
     .row:last-child { border-bottom: none; }
     .row .label { color: var(--muted); }
     .row span:last-child, .row strong:last-child { font-variant-numeric: tabular-nums; }
-    canvas { max-width: 100%; }
-    .slider-row { display: flex; gap: 10px; align-items: center; margin: 8px 0; }
-    .slider-row input[type=range] { flex: 1; }
-    .slider-row .val { width: 86px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+    /* === Charts === */
+    .chart-wrap { width: 100%; }
+    .chart-wrap.tall { height: 240px; }
+    .chart-wrap.short { height: 220px; }
+    .chart-wrap svg { display: block; width: 100%; height: 100%; }
+    .chart-legend {
+      display: flex; flex-wrap: wrap; gap: 10px 14px;
+      margin-top: 10px; font-size: 12px; color: var(--text);
+    }
+    .leg-item { display: inline-flex; align-items: center; gap: 6px; }
+    .leg-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+    /* === Slider === */
+    .slider-row { display: flex; gap: 10px; align-items: center; margin: 12px 0 8px; }
+    .slider-row input[type=range] {
+      flex: 1; height: 36px; -webkit-appearance: none; appearance: none;
+      background: transparent;
+    }
+    .slider-row input[type=range]::-webkit-slider-runnable-track {
+      height: 4px; background: var(--line); border-radius: 2px;
+    }
+    .slider-row input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--accent); margin-top: -9px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+    .slider-row input[type=range]::-moz-range-track {
+      height: 4px; background: var(--line); border-radius: 2px;
+    }
+    .slider-row input[type=range]::-moz-range-thumb {
+      width: 22px; height: 22px; border: 0; border-radius: 50%;
+      background: var(--accent);
+    }
+    .slider-row .val {
+      width: 100px; text-align: right; font-variant-numeric: tabular-nums;
+      font-weight: 600; font-size: 15px;
+    }
+
+    /* === Debt table === */
     .debt-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .debt-table th, .debt-table td { padding: 6px 4px; text-align: right; border-bottom: 1px solid var(--line); }
+    .debt-table th, .debt-table td {
+      padding: 10px 4px; text-align: right; border-bottom: 1px solid var(--line);
+    }
+    .debt-table th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
     .debt-table th:first-child, .debt-table td:first-child { text-align: left; }
-    .debt-table input { width: 64px; background: var(--panel-2); border: 1px solid var(--line); color: var(--text); padding: 4px; border-radius: 4px; text-align: right; font: inherit; font-variant-numeric: tabular-nums; }
+    .debt-table input {
+      width: 72px; background: var(--panel-2); border: 1px solid var(--line);
+      color: var(--text); padding: 8px; border-radius: 6px; text-align: right;
+      font: inherit; font-variant-numeric: tabular-nums; min-height: 36px;
+    }
+
+    /* === Modal === */
     .modal {
       position: fixed; inset: 0; background: rgba(0,0,0,0.7);
       display: none; align-items: flex-end; justify-content: center;
       z-index: 100;
     }
-    .modal.open { display: flex; }
+    .modal.open { display: flex; animation: fadeIn 0.18s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     .modal-panel {
       background: var(--bg); width: 100%; max-width: 480px;
       max-height: 92vh; overflow-y: auto;
-      border-radius: 16px 16px 0 0; padding: 18px;
+      border-radius: 18px 18px 0 0; padding: 18px;
       padding-bottom: calc(18px + env(safe-area-inset-bottom));
+      animation: slideUp 0.22s ease-out;
     }
+    @keyframes slideUp { from { transform: translateY(20px); } to { transform: translateY(0); } }
     .modal h2 { margin: 0 0 12px; font-size: 18px; }
-    label { display: block; font-size: 12px; color: var(--muted); margin-top: 10px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin-top: 12px; }
     input[type=text], input[type=number] {
       width: 100%; background: var(--panel-2); border: 1px solid var(--line);
-      color: var(--text); padding: 10px; border-radius: 8px;
-      font: inherit; margin-top: 4px;
+      color: var(--text); padding: 12px; border-radius: 10px;
+      font: inherit; margin-top: 4px; min-height: 44px;
     }
+
+    /* === New-month line items === */
     .line-item {
-      display: grid; grid-template-columns: 1fr 100px 36px;
-      gap: 6px; align-items: center; padding: 3px 0;
+      display: grid; grid-template-columns: 1fr 110px 44px;
+      gap: 6px; align-items: center; padding: 4px 0;
       font-size: 14px;
     }
-    .line-item input { margin-top: 0; padding: 8px; }
+    .line-item input { margin-top: 0; padding: 10px; min-height: 40px; }
     .line-item input[type=number] { text-align: right; font-variant-numeric: tabular-nums; }
     .nm-del {
-      width: 36px; height: 36px; padding: 0;
+      width: 44px; height: 40px; padding: 0; min-height: 40px;
       background: var(--panel-2); color: var(--muted);
-      border: 1px solid var(--line); border-radius: 6px;
+      border: 1px solid var(--line); border-radius: 8px;
       display: inline-flex; align-items: center; justify-content: center;
       font-size: 20px; line-height: 1;
     }
@@ -150,37 +240,55 @@
     .nm-add {
       background: transparent; color: var(--accent);
       border: 1px dashed var(--accent);
-      font-size: 13px; padding: 8px 14px; width: 100%;
+      font-size: 13px; padding: 10px 14px; width: 100%; min-height: 44px;
     }
     .nm-add:active { background: var(--panel-2); }
-    .toggle { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
-    .toggle input { width: 18px; height: 18px; }
+    .toggle { display: flex; align-items: center; gap: 8px; margin: 12px 0; min-height: 44px; }
+    .toggle input { width: 20px; height: 20px; }
+
+    /* === Toast === */
     .toast {
-      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      position: fixed; bottom: calc(80px + env(safe-area-inset-bottom));
+      left: 50%; transform: translateX(-50%);
       background: var(--panel-2); border: 1px solid var(--line);
-      padding: 12px 18px; border-radius: 8px; z-index: 200;
+      padding: 12px 18px; border-radius: 10px; z-index: 200;
       opacity: 0; transition: opacity 0.2s; max-width: 90vw;
       pointer-events: none;
     }
     .toast.show { opacity: 1; }
-    .loading {
-      text-align: center; padding: 30px; color: var(--muted);
-    }
+
+    /* === Misc === */
+    .loading { text-align: center; padding: 30px; color: var(--muted); }
     .err { color: var(--bad); padding: 10px; font-size: 14px; line-height: 1.5; }
     .legend { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+    /* === Bottom tab bar === */
+    nav.tabs {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      background: var(--bg); border-top: 1px solid var(--line);
+      padding-bottom: env(safe-area-inset-bottom);
+      z-index: 9;
+    }
+    nav.tabs button {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: transparent; border: none; border-radius: 0;
+      padding: 8px 4px 6px; color: var(--muted); font-size: 11px;
+      gap: 3px; min-height: 56px;
+    }
+    nav.tabs button .tab-icon {
+      font-size: 20px; line-height: 1;
+    }
+    nav.tabs button.active { color: var(--accent); }
+    nav.tabs button:active { background: var(--panel-2); transform: none; }
   </style>
 </head>
 <body>
+  <div id="ptr"><span class="ptr-arrow">↓</span><span class="ptr-text">Pull to refresh</span></div>
   <header>
     <h1>Spending</h1>
     <button id="new-month-btn" class="primary">+ New month</button>
   </header>
-  <nav class="tabs">
-    <button data-tab="overview" class="active">Overview</button>
-    <button data-tab="monthly">Monthly</button>
-    <button data-tab="debt">Debt</button>
-    <button data-tab="trends">Trends</button>
-  </nav>
   <main>
     <section id="overview" class="active">
       <div id="overview-content" class="loading">Loading…</div>
@@ -195,6 +303,12 @@
       <div id="trends-content" class="loading">Loading…</div>
     </section>
   </main>
+  <nav class="tabs">
+    <button data-tab="overview" class="active"><span class="tab-icon">▦</span><span>Overview</span></button>
+    <button data-tab="monthly"><span class="tab-icon">▤</span><span>Monthly</span></button>
+    <button data-tab="debt"><span class="tab-icon">⛁</span><span>Debt</span></button>
+    <button data-tab="trends"><span class="tab-icon">⇗</span><span>Trends</span></button>
+  </nav>
   <div id="modal-new-month" class="modal" role="dialog" aria-modal="true">
     <div class="modal-panel">
       <h2>Create new month</h2>
@@ -203,7 +317,6 @@
   </div>
   <div id="toast" class="toast"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
     // ============================================================
@@ -225,7 +338,6 @@
     // Loan row: J20 = =Debt!C7 (total monthly debt payment)
     const LOAN_CELL = { col: 'J', row: 20 };
 
-    // Default debt values from the SETUP_GUIDE reference table.
     const DEFAULT_DEBTS = [
       { name: 'Monzo loan',  balance: 16337, monthly: 408, apr: 24 },
       { name: 'Flex',        balance: 2682,  monthly: 140, apr: 24 },
@@ -234,15 +346,19 @@
     ];
     const SKIP_TABS = new Set(['Template', 'Debt', 'Debts', 'Notes', 'Summary']);
 
+    // Cache keys for offline-first
+    const CACHE_MONTHS = 'cache-months-v1';
+    const CACHE_DEBTS  = 'cache-debts-v1';
+
     // ============================================================
     // STATE
     // ============================================================
     let months = [];
-    let template = null; // parsed Template tab, used as defaults for "+ New month"
+    let template = null;
     let tokenClient = null;
-    let chartInstances = {};
     let selectedMonthIdx = -1;
     let selectedYear = null;
+    let debtsState = DEFAULT_DEBTS.map(d => ({...d}));
 
     // ============================================================
     // UTILS
@@ -256,9 +372,16 @@
       const v = n || 0;
       return (v < 0 ? '-£' : '£') + Math.abs(v).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
+    function fmtShortNum(n) {
+      const a = Math.abs(n);
+      let s;
+      if (a >= 1000000) s = (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+      else if (a >= 1000) s = (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+      else s = Math.round(n).toString();
+      return s;
+    }
     const MONTHS_MAP = { JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11 };
     const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-    // Tabs without a year suffix (e.g. "JUN") are assumed to be this year.
     const NO_YEAR_DEFAULT = 2025;
     function parseMonth(name) {
       const u = String(name).trim().toUpperCase();
@@ -287,16 +410,277 @@
     function escapeHtml(s) {
       return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
+    function svgEsc(s) {
+      return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    }
 
     // ============================================================
-    // LOAD FROM SHEET
+    // OFFLINE CACHE
     // ============================================================
-    async function loadMonths() {
+    function readCache(key) {
+      try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : null; }
+      catch { return null; }
+    }
+    function writeCache(key, data) {
+      try { localStorage.setItem(key, JSON.stringify(data)); } catch {}
+    }
+
+    // ============================================================
+    // SVG CHARTS
+    // ============================================================
+    const NS = 'http://www.w3.org/2000/svg';
+    const SVG_TEXT = '#e8ecf3', SVG_MUTED = '#8a93a6', SVG_GRID = '#2a3142';
+
+    function niceCeil(n) {
+      if (n <= 0) return 0;
+      const pow = Math.pow(10, Math.floor(Math.log10(n)));
+      const f = n / pow;
+      let nice;
+      if (f <= 1) nice = 1; else if (f <= 2) nice = 2; else if (f <= 5) nice = 5; else nice = 10;
+      return nice * pow;
+    }
+    function niceFloor(n) {
+      if (n >= 0) return 0;
+      return -niceCeil(-n);
+    }
+
+    function svgBarChart(opts) {
+      const labels = opts.labels;
+      const datasets = opts.datasets;
+      const stacked = !!opts.stacked;
+      const showLegend = datasets.length > 1 && !opts.hideLegend;
+      const W = 600, H = showLegend ? 280 : 252;
+      const M = { l: 50, r: 12, t: 12, b: showLegend ? 56 : 40 };
+      const innerW = W - M.l - M.r, innerH = H - M.t - M.b;
+      const n = labels.length;
+      if (n === 0) return `<svg viewBox="0 0 ${W} ${H}" xmlns="${NS}"></svg>`;
+
+      let maxY = 0, minY = 0;
+      if (stacked) {
+        for (let i = 0; i < n; i++) {
+          const sum = datasets.reduce((s, ds) => s + Math.max(0, ds.data[i] || 0), 0);
+          if (sum > maxY) maxY = sum;
+        }
+      } else {
+        for (const ds of datasets) for (const v of ds.data) {
+          if (v > maxY) maxY = v;
+          if (v < minY) minY = v;
+        }
+      }
+      if (maxY === 0 && minY === 0) maxY = 1;
+      const niceTop = niceCeil(maxY), niceBot = niceFloor(minY);
+      const range = niceTop - niceBot || 1;
+      const yScale = innerH / range;
+      const yZero = M.t + (niceTop * yScale);
+
+      const groupW = innerW / n;
+      const dsCount = datasets.length;
+      const padFrac = 0.25;
+      const barGroupW = groupW * (1 - padFrac);
+      const barW = stacked ? barGroupW : barGroupW / dsCount;
+
+      let bars = '';
+      for (let i = 0; i < n; i++) {
+        const xc = M.l + groupW * (i + 0.5);
+        if (stacked) {
+          let yOff = 0;
+          for (const ds of datasets) {
+            const v = Math.max(0, ds.data[i] || 0);
+            if (v === 0) continue;
+            const h = v * yScale;
+            const y = yZero - h - yOff;
+            bars += `<rect x="${xc - barW/2}" y="${y}" width="${barW}" height="${h}" fill="${ds.color}" rx="2"/>`;
+            yOff += h;
+          }
+        } else {
+          const totalW = barW * dsCount;
+          for (let d = 0; d < dsCount; d++) {
+            const ds = datasets[d];
+            const v = ds.data[i] || 0;
+            const x = xc - totalW/2 + d * barW;
+            const color = Array.isArray(ds.color) ? ds.color[i] : ds.color;
+            if (v >= 0) {
+              const h = v * yScale;
+              bars += `<rect x="${x+1}" y="${yZero - h}" width="${Math.max(1, barW - 2)}" height="${h}" fill="${color}" rx="2"/>`;
+            } else {
+              const h = Math.abs(v) * yScale;
+              bars += `<rect x="${x+1}" y="${yZero}" width="${Math.max(1, barW - 2)}" height="${h}" fill="${color}" rx="2"/>`;
+            }
+          }
+        }
+      }
+
+      let grid = '';
+      const yTicks = 4;
+      for (let i = 0; i <= yTicks; i++) {
+        const v = niceBot + range * i / yTicks;
+        const y = yZero - v * yScale;
+        grid += `<line x1="${M.l}" x2="${W - M.r}" y1="${y}" y2="${y}" stroke="${SVG_GRID}" stroke-width="0.5" opacity="0.7"/>`;
+        grid += `<text x="${M.l - 6}" y="${y + 4}" fill="${SVG_MUTED}" font-size="10" text-anchor="end">£${fmtShortNum(v)}</text>`;
+      }
+
+      let xLabels = '';
+      const labelStep = n <= 8 ? 1 : Math.ceil(n / 8);
+      const rotate = n > 6;
+      for (let i = 0; i < n; i++) {
+        if (i % labelStep !== 0 && i !== n - 1) continue;
+        const x = M.l + groupW * (i + 0.5);
+        const y = H - M.b + 14;
+        if (rotate) {
+          xLabels += `<text x="${x}" y="${y + 2}" fill="${SVG_MUTED}" font-size="10" text-anchor="end" transform="rotate(-40 ${x} ${y + 2})">${svgEsc(labels[i])}</text>`;
+        } else {
+          xLabels += `<text x="${x}" y="${y}" fill="${SVG_MUTED}" font-size="11" text-anchor="middle">${svgEsc(labels[i])}</text>`;
+        }
+      }
+
+      let legend = '';
+      if (showLegend) {
+        let xOff = M.l;
+        const legY = H - 8;
+        for (const ds of datasets) {
+          const lblW = ds.label.length * 6.2 + 14 + 8;
+          legend += `<rect x="${xOff}" y="${legY-10}" width="10" height="10" rx="2" fill="${ds.color}"/>`;
+          legend += `<text x="${xOff+14}" y="${legY-1}" fill="${SVG_TEXT}" font-size="11">${svgEsc(ds.label)}</text>`;
+          xOff += lblW;
+        }
+      }
+      return `<svg viewBox="0 0 ${W} ${H}" xmlns="${NS}" preserveAspectRatio="xMidYMid meet">${grid}${bars}${xLabels}${legend}</svg>`;
+    }
+
+    function svgDoughnut(opts) {
+      const labels = opts.labels;
+      const data = opts.data;
+      const colors = opts.colors;
+      const total = data.reduce((s, v) => s + Math.max(0, v), 0);
+      const W = 240, H = 240, cx = W/2, cy = H/2, rOut = 95, rIn = 60;
+
+      if (total <= 0) {
+        return `<svg viewBox="0 0 ${W} ${H}" xmlns="${NS}" preserveAspectRatio="xMidYMid meet">
+          <circle cx="${cx}" cy="${cy}" r="${rOut}" fill="${SVG_GRID}" opacity="0.3"/>
+          <text x="${cx}" y="${cy+5}" fill="${SVG_MUTED}" font-size="13" text-anchor="middle">No data</text>
+        </svg>`;
+      }
+
+      let angle = -Math.PI / 2;
+      let paths = '';
+      for (let i = 0; i < data.length; i++) {
+        const v = Math.max(0, data[i] || 0);
+        if (v <= 0) continue;
+        const a2 = angle + (v / total) * 2 * Math.PI;
+        const x1 = cx + rOut * Math.cos(angle), y1 = cy + rOut * Math.sin(angle);
+        const x2 = cx + rOut * Math.cos(a2),    y2 = cy + rOut * Math.sin(a2);
+        const x3 = cx + rIn  * Math.cos(a2),    y3 = cy + rIn  * Math.sin(a2);
+        const x4 = cx + rIn  * Math.cos(angle), y4 = cy + rIn  * Math.sin(angle);
+        const large = (a2 - angle) > Math.PI ? 1 : 0;
+        paths += `<path d="M ${x1} ${y1} A ${rOut} ${rOut} 0 ${large} 1 ${x2} ${y2} L ${x3} ${y3} A ${rIn} ${rIn} 0 ${large} 0 ${x4} ${y4} Z" fill="${colors[i]}" stroke="#161a23" stroke-width="2"/>`;
+        angle = a2;
+      }
+      const centerLabel = opts.centerLabel || 'Total';
+      paths += `<text x="${cx}" y="${cy - 5}" fill="${SVG_MUTED}" font-size="10" text-anchor="middle">${svgEsc(centerLabel)}</text>`;
+      paths += `<text x="${cx}" y="${cy + 14}" fill="${SVG_TEXT}" font-size="18" font-weight="600" text-anchor="middle">£${fmtShortNum(total)}</text>`;
+      return `<svg viewBox="0 0 ${W} ${H}" xmlns="${NS}" preserveAspectRatio="xMidYMid meet">${paths}</svg>`;
+    }
+
+    function svgLegendHTML(items) {
+      return `<div class="chart-legend">${items.map(it =>
+        `<span class="leg-item"><span class="leg-dot" style="background:${it.color}"></span>${escapeHtml(it.label)}</span>`
+      ).join('')}</div>`;
+    }
+
+    function svgLineChart(opts) {
+      const labels = opts.labels;
+      const datasets = opts.datasets;
+      const showLegend = datasets.length > 1 && !opts.hideLegend;
+      const W = 600, H = showLegend ? 270 : 240;
+      const M = { l: 50, r: 12, t: 12, b: showLegend ? 50 : 40 };
+      const innerW = W - M.l - M.r, innerH = H - M.t - M.b;
+      const n = labels.length;
+      if (n === 0) return `<svg viewBox="0 0 ${W} ${H}" xmlns="${NS}"></svg>`;
+
+      let maxY = 0, minY = 0;
+      for (const ds of datasets) for (const v of ds.data) {
+        if (v > maxY) maxY = v;
+        if (v < minY) minY = v;
+      }
+      if (maxY === 0 && minY === 0) maxY = 1;
+      const niceTop = niceCeil(maxY), niceBot = niceFloor(minY);
+      const range = niceTop - niceBot || 1;
+      const yScale = innerH / range;
+      const yZero = M.t + (niceTop * yScale);
+      const xStep = n > 1 ? innerW / (n - 1) : 0;
+
+      let grid = '';
+      const yTicks = 4;
+      for (let i = 0; i <= yTicks; i++) {
+        const v = niceBot + range * i / yTicks;
+        const y = yZero - v * yScale;
+        grid += `<line x1="${M.l}" x2="${W - M.r}" y1="${y}" y2="${y}" stroke="${SVG_GRID}" stroke-width="0.5" opacity="0.7"/>`;
+        grid += `<text x="${M.l - 6}" y="${y + 4}" fill="${SVG_MUTED}" font-size="10" text-anchor="end">£${fmtShortNum(v)}</text>`;
+      }
+
+      let lines = '';
+      for (const ds of datasets) {
+        let pathD = '', areaD = '';
+        for (let i = 0; i < n; i++) {
+          const v = ds.data[i] || 0;
+          const x = M.l + i * xStep;
+          const y = yZero - v * yScale;
+          pathD += (i === 0 ? 'M' : 'L') + ` ${x} ${y} `;
+          if (ds.fill) {
+            if (i === 0) areaD += `M ${x} ${yZero} L ${x} ${y} `;
+            else areaD += `L ${x} ${y} `;
+          }
+        }
+        if (ds.fill && n > 0) {
+          const lastX = M.l + (n - 1) * xStep;
+          areaD += `L ${lastX} ${yZero} Z`;
+          lines += `<path d="${areaD}" fill="${ds.color}" opacity="0.15"/>`;
+        }
+        lines += `<path d="${pathD}" fill="none" stroke="${ds.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+      }
+
+      let xLabels = '';
+      const labelStep = n <= 8 ? 1 : Math.ceil(n / 8);
+      const rotate = n > 6 && labels.some(l => String(l).length > 4);
+      for (let i = 0; i < n; i++) {
+        if (i % labelStep !== 0 && i !== n - 1) continue;
+        const x = M.l + i * xStep;
+        const y = H - M.b + 14;
+        if (rotate) {
+          xLabels += `<text x="${x}" y="${y + 2}" fill="${SVG_MUTED}" font-size="10" text-anchor="end" transform="rotate(-40 ${x} ${y + 2})">${svgEsc(labels[i])}</text>`;
+        } else {
+          xLabels += `<text x="${x}" y="${y}" fill="${SVG_MUTED}" font-size="11" text-anchor="middle">${svgEsc(labels[i])}</text>`;
+        }
+      }
+
+      let legend = '';
+      if (showLegend) {
+        let xOff = M.l;
+        const legY = H - 8;
+        for (const ds of datasets) {
+          const lblW = String(ds.label).length * 6.2 + 18 + 8;
+          legend += `<line x1="${xOff}" x2="${xOff+14}" y1="${legY-5}" y2="${legY-5}" stroke="${ds.color}" stroke-width="2.5" stroke-linecap="round"/>`;
+          legend += `<text x="${xOff+18}" y="${legY-1}" fill="${SVG_TEXT}" font-size="11">${svgEsc(ds.label)}</text>`;
+          xOff += lblW;
+        }
+      }
+      return `<svg viewBox="0 0 ${W} ${H}" xmlns="${NS}" preserveAspectRatio="xMidYMid meet">${grid}${lines}${xLabels}${legend}</svg>`;
+    }
+
+    // ============================================================
+    // LOAD FROM SHEET (with offline cache + SWR)
+    // ============================================================
+    async function loadMonths({ silent = false } = {}) {
+      // Show cached first
+      const cached = readCache(CACHE_MONTHS);
+      if (cached && cached.months && months.length === 0) {
+        months = cached.months.map(m => ({ ...m, dateKey: new Date(m.dateKey) }));
+        template = cached.template ? { ...cached.template } : null;
+        renderAll();
+      }
       try {
         if (API_KEY.startsWith('PASTE_')) {
-          $('#overview-content').innerHTML = `<div class="err">Set <code>API_KEY</code> in index.html (see SETUP_GUIDE).</div>`;
-          $('#monthly-content').innerHTML = '';
-          $('#trends-content').innerHTML = '';
+          if (!cached) $('#overview-content').innerHTML = `<div class="err">Set <code>API_KEY</code> in index.html.</div>`;
           return;
         }
         const metaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?key=${API_KEY}&fields=sheets.properties(sheetId,title)`;
@@ -322,11 +706,16 @@
         months.sort((a, b) => a.dateKey - b.dateKey);
         const templateGrid = val.valueRanges[monthNames.length].values || [];
         template = parseMonthData('Template', templateGrid);
+        writeCache(CACHE_MONTHS, { months: months.map(m => ({...m, dateKey: m.dateKey.toISOString()})), template, cachedAt: Date.now() });
         renderAll();
       } catch (e) {
         console.error(e);
-        $('#overview-content').innerHTML =
-          `<div class="err">Couldn't load sheet: ${escapeHtml(e.message)}.<br>Check <code>API_KEY</code> and that the sheet is shared "Anyone with the link can view".</div>`;
+        if (!cached && !silent) {
+          $('#overview-content').innerHTML =
+            `<div class="err">Couldn't load sheet: ${escapeHtml(e.message)}.<br>Check <code>API_KEY</code> and that the sheet is shared "Anyone with the link can view".</div>`;
+        } else if (!silent) {
+          showToast('Refresh failed — showing cached data');
+        }
       }
     }
 
@@ -372,24 +761,11 @@
       renderOverview();
       renderMonthly();
       renderTrends();
-      // Debt renders independently (doesn't need sheet)
     }
 
-    function destroyChart(key) {
-      if (chartInstances[key]) { chartInstances[key].destroy(); delete chartInstances[key]; }
-    }
-
-    function chartOpts(extra = {}) {
-      return {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#e8ecf3', font: { size: 11 } } } },
-        scales: {
-          x: { ticks: { color: '#8a93a6' }, grid: { color: '#2a3142' }, stacked: !!extra.stacked },
-          y: { ticks: { color: '#8a93a6', callback: v => '£' + v.toLocaleString('en-GB') }, grid: { color: '#2a3142' }, stacked: !!extra.stacked, beginAtZero: true },
-        },
-      };
-    }
+    const CAT_COLORS = {
+      main: '#5b9cff', optional: '#fbbf24', savings: '#4ade80', debt: '#f87171', car: '#a78bfa',
+    };
 
     function renderOverview() {
       const n = months.length;
@@ -408,40 +784,31 @@
         </div>
         <div class="card">
           <h2>Income vs spending</h2>
-          <div style="height:220px"><canvas id="chart-incspend"></canvas></div>
+          <div class="chart-wrap short">${svgBarChart({
+            labels: months.map(m => m.name),
+            datasets: [
+              { label: 'Income',   data: months.map(m => m.income),     color: '#4ade80' },
+              { label: 'Spending', data: months.map(m => m.spendTotal), color: '#f87171' },
+            ],
+          })}</div>
         </div>
         <div class="card">
-          <h2>Category breakdown — ${latest ? latest.name : '—'}</h2>
-          <div style="height:240px"><canvas id="chart-cats"></canvas></div>
+          <h2>Category breakdown — ${latest ? escapeHtml(latest.name) : '—'}</h2>
+          <div class="chart-wrap tall">${latest ? svgDoughnut({
+            labels: ['Main','Optional','Savings','Debt','Car'],
+            data: [latest.main, latest.optional, latest.savings, latest.loan, latest.car],
+            colors: [CAT_COLORS.main, CAT_COLORS.optional, CAT_COLORS.savings, CAT_COLORS.debt, CAT_COLORS.car],
+            centerLabel: 'Total spent',
+          }) : '<div class="loading">—</div>'}</div>
+          ${latest ? svgLegendHTML([
+            { label: 'Main', color: CAT_COLORS.main },
+            { label: 'Optional', color: CAT_COLORS.optional },
+            { label: 'Savings', color: CAT_COLORS.savings },
+            { label: 'Debt', color: CAT_COLORS.debt },
+            { label: 'Car', color: CAT_COLORS.car },
+          ]) : ''}
         </div>
       `;
-      destroyChart('incspend'); destroyChart('cats');
-      const labels = months.map(m => m.name);
-      chartInstances.incspend = new Chart($('#chart-incspend'), {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [
-            { label: 'Income', data: months.map(m => m.income), backgroundColor: '#4ade80' },
-            { label: 'Spending', data: months.map(m => m.spendTotal), backgroundColor: '#f87171' },
-          ],
-        },
-        options: chartOpts(),
-      });
-      if (latest) {
-        chartInstances.cats = new Chart($('#chart-cats'), {
-          type: 'doughnut',
-          data: {
-            labels: ['Main', 'Optional', 'Savings', 'Debt', 'Car'],
-            datasets: [{
-              data: [latest.main, latest.optional, latest.savings, latest.loan, latest.car],
-              backgroundColor: ['#5b9cff','#fbbf24','#4ade80','#f87171','#a78bfa'],
-              borderColor: '#161a23', borderWidth: 2,
-            }],
-          },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#e8ecf3', font: { size: 11 } } } } },
-        });
-      }
     }
 
     function renderMonthly() {
@@ -449,7 +816,6 @@
         $('#monthly-content').innerHTML = '<div class="loading">No months loaded.</div>';
         return;
       }
-      // Group months by year
       const byYear = {};
       for (const m of months) {
         const y = m.dateKey.getFullYear();
@@ -457,8 +823,6 @@
       }
       const years = Object.keys(byYear).map(Number).sort((a, b) => a - b);
       if (!selectedYear || !byYear[selectedYear]) selectedYear = years[years.length - 1];
-
-      // If current selection isn't in the visible year, pick the latest month in that year
       const inYear = byYear[selectedYear];
       const currentInYear = selectedMonthIdx >= 0 && months[selectedMonthIdx] &&
         months[selectedMonthIdx].dateKey.getFullYear() === selectedYear;
@@ -488,6 +852,7 @@
       });
       renderMonthlyDetail();
     }
+
     function renderMonthlyDetail() {
       const m = months[selectedMonthIdx];
       if (!m) return;
@@ -497,7 +862,19 @@
       $('#monthly-detail').innerHTML = `
         <div class="card">
           <h2>${escapeHtml(m.name)} — split</h2>
-          <div style="height:220px"><canvas id="chart-month"></canvas></div>
+          <div class="chart-wrap tall">${svgDoughnut({
+            labels: ['Main','Optional','Savings','Debt','Car'],
+            data: [m.main, m.optional, m.savings, m.loan, m.car],
+            colors: [CAT_COLORS.main, CAT_COLORS.optional, CAT_COLORS.savings, CAT_COLORS.debt, CAT_COLORS.car],
+            centerLabel: 'Spent',
+          })}</div>
+          ${svgLegendHTML([
+            { label: 'Main', color: CAT_COLORS.main },
+            { label: 'Optional', color: CAT_COLORS.optional },
+            { label: 'Savings', color: CAT_COLORS.savings },
+            { label: 'Debt', color: CAT_COLORS.debt },
+            { label: 'Car', color: CAT_COLORS.car },
+          ])}
         </div>
         <div class="card"><h2>Income</h2>${lineList(m.incomeLines)}
           <div class="row"><strong>Total</strong><strong>${fmt2(m.income)}</strong></div></div>
@@ -517,31 +894,13 @@
           <div class="row"><strong>Remaining</strong><strong style="color:${m.surplus>=0?'var(--good)':'var(--bad)'}">${fmt2(m.surplus)}</strong></div>
         </div>
       `;
-      destroyChart('month');
-      chartInstances.month = new Chart($('#chart-month'), {
-        type: 'doughnut',
-        data: {
-          labels: ['Main','Optional','Savings','Debt','Car'],
-          datasets: [{
-            data: [m.main, m.optional, m.savings, m.loan, m.car],
-            backgroundColor: ['#5b9cff','#fbbf24','#4ade80','#f87171','#a78bfa'],
-            borderColor: '#161a23', borderWidth: 2,
-          }],
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#e8ecf3', font: { size: 11 } } } } },
-      });
     }
 
     // ============================================================
     // DEBT
     // ============================================================
-    // debtsState comes from the sheet (Debt!A3:C6).
-    // APRs live in localStorage (the sheet has no APR column).
-    let debtsState = DEFAULT_DEBTS.map(d => ({...d}));
-
     function loadAprs() {
-      try { return JSON.parse(localStorage.getItem('debtAprs') || '{}'); }
-      catch { return {}; }
+      try { return JSON.parse(localStorage.getItem('debtAprs') || '{}'); } catch { return {}; }
     }
     function saveAprs(map) { localStorage.setItem('debtAprs', JSON.stringify(map)); }
     function aprFor(name) {
@@ -550,15 +909,16 @@
       const def = DEFAULT_DEBTS.find(d => d.name.toLowerCase() === name.toLowerCase());
       return def ? def.apr : 24;
     }
-    function setApr(name, v) {
-      const m = loadAprs();
-      m[name] = +v || 0;
-      saveAprs(m);
-    }
+    function setApr(name, v) { const m = loadAprs(); m[name] = +v || 0; saveAprs(m); }
     function loadExtra() { return +(localStorage.getItem('extraPayment') || 0); }
     function saveExtra(v) { localStorage.setItem('extraPayment', String(v)); }
 
     async function loadDebtsFromSheet() {
+      const cached = readCache(CACHE_DEBTS);
+      if (cached && Array.isArray(cached) && cached.length) {
+        debtsState = cached.map(d => ({ ...d, apr: aprFor(d.name) }));
+        renderDebt();
+      }
       if (API_KEY.startsWith('PASTE_')) return;
       try {
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/Debt!A3:C6?key=${API_KEY}&valueRenderOption=UNFORMATTED_VALUE`;
@@ -572,6 +932,7 @@
             const name = String(r[0]).trim();
             return { name, balance: num(r[1]), monthly: num(r[2]), apr: aprFor(name) };
           });
+        writeCache(CACHE_DEBTS, debtsState.map(d => ({ name: d.name, balance: d.balance, monthly: d.monthly })));
         renderDebt();
       } catch (e) {
         console.error('Debt load:', e);
@@ -579,7 +940,6 @@
     }
 
     async function writeDebtCell(rowIndex, col, value) {
-      // rowIndex is 0-based index into debtsState; sheet rows are 3..6.
       const sheetRow = rowIndex + 3;
       const range = `Debt!${col}${sheetRow}`;
       const token = await getAccessToken();
@@ -631,6 +991,9 @@
       const saved = baseline.totalInterest - withExtra.totalInterest;
       const totalBal = debts.reduce((s, x) => s + x.balance, 0);
       const totalMin = debts.reduce((s, x) => s + x.monthly, 0);
+      const maxLen = Math.max(baseline.schedule.length, withExtra.schedule.length);
+      const monthLabels = Array.from({length: maxLen}, (_, i) => String(i));
+
       $('#debt-content').innerHTML = `
         <div class="card">
           <h2>Debt summary</h2>
@@ -661,15 +1024,20 @@
                   <td><input type="number" data-f="balance" data-i="${i}" value="${x.balance}" step="1" inputmode="decimal"></td>
                   <td><input type="number" data-f="monthly" data-i="${i}" value="${x.monthly}" step="1" inputmode="decimal"></td>
                   <td><input type="number" data-f="apr"     data-i="${i}" value="${x.apr}"     step="0.1" inputmode="decimal"></td>
-                </tr>
-              `).join('')}
+                </tr>`).join('')}
             </tbody>
           </table>
           <div class="legend">Balance &amp; Monthly write to the sheet (Google sign-in required). APR is saved on this device only.</div>
         </div>
         <div class="card">
           <h2>Payoff projection</h2>
-          <div style="height:220px"><canvas id="chart-payoff"></canvas></div>
+          <div class="chart-wrap short">${svgLineChart({
+            labels: monthLabels,
+            datasets: [
+              { label: 'Baseline', data: baseline.schedule.map(s => s.remaining), color: '#f87171', fill: true },
+              { label: `+${fmt(extra)}/mo`, data: withExtra.schedule.map(s => s.remaining), color: '#4ade80', fill: true },
+            ],
+          })}</div>
         </div>
       `;
       $('#extra-slider').addEventListener('input', (e) => {
@@ -683,39 +1051,26 @@
           const v = +inp.value || 0;
           const debt = debtsState[i]; if (!debt) return;
           if (field === 'apr') {
-            debt.apr = v;
-            setApr(debt.name, v);
+            debt.apr = v; setApr(debt.name, v);
             renderDebt();
             return;
           }
-          // balance or monthly → write to sheet
           const colMap = { balance: 'B', monthly: 'C' };
           const prev = debt[field];
           debt[field] = v;
+          writeCache(CACHE_DEBTS, debtsState.map(d => ({ name: d.name, balance: d.balance, monthly: d.monthly })));
           renderDebt();
           try {
             await writeDebtCell(i, colMap[field], v);
             showToast('Saved ' + debt.name + ' ' + field);
           } catch (e) {
             console.error(e);
-            debt[field] = prev; // rollback
+            debt[field] = prev;
+            writeCache(CACHE_DEBTS, debtsState.map(d => ({ name: d.name, balance: d.balance, monthly: d.monthly })));
             renderDebt();
             showToast('Save failed: ' + e.message, 4000);
           }
         });
-      });
-      destroyChart('payoff');
-      const maxLen = Math.max(baseline.schedule.length, withExtra.schedule.length);
-      chartInstances.payoff = new Chart($('#chart-payoff'), {
-        type: 'line',
-        data: {
-          labels: Array.from({length: maxLen}, (_, i) => i),
-          datasets: [
-            { label: 'Baseline', data: baseline.schedule.map(s => s.remaining), borderColor: '#f87171', backgroundColor: 'rgba(248,113,113,0.1)', tension: 0.2, pointRadius: 0 },
-            { label: `+${fmt(extra)}/mo`, data: withExtra.schedule.map(s => s.remaining), borderColor: '#4ade80', backgroundColor: 'rgba(74,222,128,0.1)', tension: 0.2, pointRadius: 0 },
-          ],
-        },
-        options: chartOpts(),
       });
     }
 
@@ -723,54 +1078,48 @@
     // TRENDS
     // ============================================================
     function renderTrends() {
+      if (!months.length) {
+        $('#trends-content').innerHTML = '<div class="loading">No months loaded.</div>';
+        return;
+      }
+      const labels = months.map(m => m.name);
+      const surplus = months.map(m => m.surplus);
+      const surplusColors = surplus.map(v => v >= 0 ? '#4ade80' : '#f87171');
+      let cum = 0;
+      const cumData = months.map(m => (cum += m.savings));
+
       $('#trends-content').innerHTML = `
         <div class="card">
           <h2>Surplus / deficit</h2>
-          <div style="height:220px"><canvas id="chart-surplus"></canvas></div>
+          <div class="chart-wrap short">${svgBarChart({
+            labels,
+            datasets: [{ label: 'Surplus', data: surplus, color: surplusColors }],
+            hideLegend: true,
+          })}</div>
         </div>
         <div class="card">
-          <h2>Necessary expenses</h2>
-          <div style="height:220px"><canvas id="chart-nec"></canvas></div>
+          <h2>Necessary expenses (stacked)</h2>
+          <div class="chart-wrap short">${svgBarChart({
+            labels,
+            datasets: [
+              { label: 'Main',    data: months.map(m => m.main),    color: CAT_COLORS.main },
+              { label: 'Debt',    data: months.map(m => m.loan),    color: CAT_COLORS.debt },
+              { label: 'Savings', data: months.map(m => m.savings), color: CAT_COLORS.savings },
+              { label: 'Car',     data: months.map(m => m.car),     color: CAT_COLORS.car },
+            ],
+            stacked: true,
+          })}</div>
           <div class="legend">Main + Debt + Savings (+ Car if active)</div>
         </div>
         <div class="card">
           <h2>Cumulative savings</h2>
-          <div style="height:220px"><canvas id="chart-cum"></canvas></div>
+          <div class="chart-wrap short">${svgLineChart({
+            labels,
+            datasets: [{ label: 'Cumulative savings', data: cumData, color: '#4ade80', fill: true }],
+            hideLegend: true,
+          })}</div>
         </div>
       `;
-      if (!months.length) return;
-      const labels = months.map(m => m.name);
-      const surplus = months.map(m => m.surplus);
-      destroyChart('surplus'); destroyChart('nec'); destroyChart('cum');
-      chartInstances.surplus = new Chart($('#chart-surplus'), {
-        type: 'bar',
-        data: { labels, datasets: [{
-          label: 'Surplus', data: surplus,
-          backgroundColor: surplus.map(v => v >= 0 ? '#4ade80' : '#f87171'),
-        }] },
-        options: chartOpts(),
-      });
-      chartInstances.nec = new Chart($('#chart-nec'), {
-        type: 'bar',
-        data: { labels, datasets: [
-          { label: 'Main',    data: months.map(m => m.main),    backgroundColor: '#5b9cff', stack: 's' },
-          { label: 'Debt',    data: months.map(m => m.loan),    backgroundColor: '#f87171', stack: 's' },
-          { label: 'Savings', data: months.map(m => m.savings), backgroundColor: '#4ade80', stack: 's' },
-          { label: 'Car',     data: months.map(m => m.car),     backgroundColor: '#a78bfa', stack: 's' },
-        ] },
-        options: chartOpts({ stacked: true }),
-      });
-      let cum = 0;
-      const cumData = months.map(m => (cum += m.savings));
-      chartInstances.cum = new Chart($('#chart-cum'), {
-        type: 'line',
-        data: { labels, datasets: [{
-          label: 'Cumulative savings', data: cumData,
-          borderColor: '#4ade80', backgroundColor: 'rgba(74,222,128,0.15)',
-          tension: 0.2, fill: true, pointRadius: 3,
-        }] },
-        options: chartOpts(),
-      });
     }
 
     // ============================================================
@@ -780,7 +1129,16 @@
       b.addEventListener('click', () => {
         document.querySelectorAll('nav.tabs button').forEach(x => x.classList.toggle('active', x === b));
         const id = b.dataset.tab;
-        document.querySelectorAll('main section').forEach(s => s.classList.toggle('active', s.id === id));
+        document.querySelectorAll('main section').forEach(s => {
+          if (s.id === id) {
+            s.classList.remove('active');
+            void s.offsetWidth; // restart animation
+            s.classList.add('active');
+          } else {
+            s.classList.remove('active');
+          }
+        });
+        window.scrollTo({ top: 0 });
       });
     });
 
@@ -792,9 +1150,7 @@
       if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return null;
       try {
         tokenClient = google.accounts.oauth2.initTokenClient({
-          client_id: CLIENT_ID,
-          scope: SCOPES,
-          callback: () => {},
+          client_id: CLIENT_ID, scope: SCOPES, callback: () => {},
         });
       } catch (e) { console.error(e); }
       return tokenClient;
@@ -814,8 +1170,6 @@
 
     $('#new-month-btn').addEventListener('click', openNewMonth);
 
-    // Per-section state for the "+ New month" modal.
-    // Each entry: { label, amount, fromTemplate: bool }
     let nmState = null;
     const SECTIONS = [
       { key: 'income',   title: 'Salary',        seedKey: 'incomeLines' },
@@ -881,7 +1235,6 @@
           <button id="nm-create" class="primary" style="flex:1">Create month</button>
         </div>
       `;
-      // Wire up handlers
       $('#new-month-body').querySelectorAll('input[data-section]').forEach(inp => {
         inp.addEventListener('input', () => {
           const sec = inp.dataset.section, i = +inp.dataset.i, f = inp.dataset.f;
@@ -910,9 +1263,6 @@
       $('#nm-create').addEventListener('click', createMonth);
     }
 
-    // Sheet layout for WRITING a new month. expandable=true means we can
-    // insertRange in the section's column slice to extend the SUM range
-    // without disturbing other sections.
     const SECTION_DEFS = {
       income:   { startRow: 2,  endRow: 6,  labelCol: 'C', amountCol: 'D', expandable: false },
       main:     { startRow: 11, endRow: 32, labelCol: 'C', amountCol: 'D', expandable: true },
@@ -936,7 +1286,6 @@
         const tmplMeta = meta.sheets.find(s => s.properties.title === 'Template');
         if (!tmplMeta) throw new Error('"Template" tab not found in spreadsheet');
 
-        // 1. Duplicate Template -> new tab
         const dupRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
@@ -948,9 +1297,6 @@
         const dupJson = await dupRes.json();
         const newSheetId = dupJson.replies[0].duplicateSheet.properties.sheetId;
 
-        // 2. Apply insertRange for any expandable section needing extra rows.
-        // We only shift the section's own 2-column slice, so sections in different
-        // columns don't interfere with each other.
         const insertRequests = [];
         for (const [key, def] of Object.entries(SECTION_DEFS)) {
           if (key === 'car' && !nmState.carIncluded) continue;
@@ -981,12 +1327,10 @@
           if (!insRes.ok) throw new Error('Insert rows failed: ' + (await insRes.text()));
         }
 
-        // 3. Write labels + amounts for each section, padding/clearing as needed.
         const escName = newName.replace(/'/g, "''");
         const data = [];
         for (const [key, def] of Object.entries(SECTION_DEFS)) {
           if (key === 'car' && !nmState.carIncluded) {
-            // Clear car section so the duplicated template values don't carry over.
             const blankLen = def.endRow - def.startRow + 1;
             data.push({
               range: `'${escName}'!${def.labelCol}${def.startRow}:${def.amountCol}${def.startRow + blankLen - 1}`,
@@ -1025,6 +1369,65 @@
         btn.disabled = false; btn.textContent = 'Create month';
       }
     }
+
+    // ============================================================
+    // PULL TO REFRESH
+    // ============================================================
+    (function setupPTR() {
+      const ind = $('#ptr');
+      const text = ind.querySelector('.ptr-text');
+      let startY = 0, pulling = false, pull = 0, refreshing = false;
+      const TRIGGER = 70;
+
+      window.addEventListener('touchstart', (e) => {
+        if (refreshing) return;
+        if (window.scrollY > 0) { pulling = false; return; }
+        startY = e.touches[0].clientY;
+        pulling = true;
+        pull = 0;
+      }, { passive: true });
+
+      window.addEventListener('touchmove', (e) => {
+        if (!pulling || refreshing) return;
+        const dy = e.touches[0].clientY - startY;
+        if (dy <= 0) {
+          pull = 0;
+          ind.style.height = '0px'; ind.style.opacity = '0';
+          return;
+        }
+        pull = Math.min(dy * 0.55, 110);
+        ind.style.height = pull + 'px';
+        ind.style.opacity = Math.min(1, pull / TRIGGER).toString();
+        if (pull >= TRIGGER) { ind.classList.add('ready'); text.textContent = 'Release to refresh'; }
+        else { ind.classList.remove('ready'); text.textContent = 'Pull to refresh'; }
+      }, { passive: true });
+
+      window.addEventListener('touchend', async () => {
+        if (!pulling || refreshing) { pulling = false; return; }
+        pulling = false;
+        if (pull >= TRIGGER) {
+          refreshing = true;
+          ind.classList.remove('ready'); ind.classList.add('loading');
+          text.textContent = 'Refreshing…';
+          ind.style.height = '54px'; ind.style.opacity = '1';
+          try {
+            await Promise.all([loadMonths({ silent: true }), loadDebtsFromSheet()]);
+            text.textContent = 'Updated';
+          } catch (e) {
+            text.textContent = 'Refresh failed';
+          }
+          setTimeout(() => {
+            ind.classList.remove('loading');
+            ind.style.height = '0px'; ind.style.opacity = '0';
+            refreshing = false;
+            text.textContent = 'Pull to refresh';
+          }, 600);
+        } else {
+          ind.style.height = '0px'; ind.style.opacity = '0';
+        }
+        pull = 0;
+      });
+    })();
 
     // ============================================================
     // SERVICE WORKER

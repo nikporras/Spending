@@ -1,6 +1,6 @@
 // PWA shell cache. App data (Google Sheets API) is never cached.
 // Bump CACHE when shipping a new build so old shell is wiped.
-const CACHE = 'spending-v3';
+const CACHE = 'spending-v4';
 const SHELL = [
   './',
   './index.html',
