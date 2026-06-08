@@ -91,15 +91,105 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* === Cards === */
+    /* === Cards (kept only for charts and a few boxed areas) === */
     .card {
       background: var(--panel); border: 1px solid var(--line);
-      border-radius: 14px; padding: 14px; margin-bottom: 12px;
+      border-radius: 14px; padding: 14px; margin-bottom: 16px;
     }
     .card h2 {
       font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
       color: var(--muted); margin: 0 0 10px; font-weight: 600;
     }
+
+    /* === Monzo-style flat sections (no box) === */
+    .hero {
+      padding: 4px 4px 20px;
+    }
+    .hero-label {
+      font-size: 11px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+    .hero-value {
+      font-size: 42px; font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -1px; margin: 4px 0 2px;
+      line-height: 1.05;
+    }
+    .hero-value.good { color: var(--good); }
+    .hero-value.bad  { color: var(--bad); }
+    .hero-sub {
+      font-size: 13px; color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .section-head {
+      font-size: 11px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.7px; font-weight: 600;
+      padding: 0 4px 8px;
+      margin-top: 24px;
+    }
+    .section-head:first-child { margin-top: 8px; }
+
+    .list {
+      background: transparent;
+      margin-bottom: 8px;
+    }
+    .list-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 4px;
+      border-bottom: 1px solid var(--line);
+      min-height: 56px;
+      background: transparent; border-left: none; border-right: none; border-top: none;
+      width: 100%; text-align: left; color: inherit; font: inherit;
+      cursor: pointer; border-radius: 0;
+    }
+    .list-row:active { background: var(--panel-2); transform: none; }
+    .list-row:last-child { border-bottom: none; }
+    .list-row .lr-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    }
+    .list-row .lr-main { flex: 1; min-width: 0; }
+    .list-row .lr-title { font-size: 15px; font-weight: 500; color: var(--text); }
+    .list-row .lr-sub   { font-size: 12px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .list-row .lr-amount {
+      font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums;
+    }
+    .list-row .lr-amount.good { color: var(--good); }
+    .list-row .lr-amount.bad  { color: var(--bad); }
+    .list-row .lr-chev {
+      color: var(--muted); font-size: 14px; margin-left: 6px;
+      transition: transform 0.18s;
+    }
+    .list-row.open .lr-chev { transform: rotate(180deg); color: var(--accent); }
+
+    .list-row-body {
+      padding: 4px 4px 14px 26px;
+      max-height: 0; overflow: hidden;
+      transition: max-height 0.22s ease-out;
+    }
+    .list-row.open + .list-row-body { max-height: 4000px; }
+    .list-row-body .sub-row {
+      display: flex; justify-content: space-between; gap: 12px;
+      padding: 7px 0; font-size: 13px;
+      border-bottom: 1px solid var(--line);
+    }
+    .list-row-body .sub-row:last-child { border-bottom: none; }
+    .list-row-body .sub-row .sub-label { color: var(--muted); }
+    .list-row-body .sub-row span:last-child { font-variant-numeric: tabular-nums; }
+
+    .quick-row {
+      display: flex; gap: 8px; padding: 4px 0 18px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    .quick-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px; background: var(--panel-2);
+      border: 1px solid var(--line); border-radius: 999px;
+      font-size: 13px; color: var(--muted); white-space: nowrap;
+      font-variant-numeric: tabular-nums; min-height: 36px;
+    }
+    .quick-pill .qp-dot { width: 8px; height: 8px; border-radius: 50%; }
 
     /* === Stat grid === */
     .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -836,23 +926,14 @@
       const avgIncome = avg('income'), avgSpend = avg('spendTotal'), avgSurplus = avg('surplus');
       const latest = months[months.length - 1];
       $('#overview-content').innerHTML = `
-        <div class="bento">
-          <div class="tile">
-            <div class="tile-label">Avg income</div>
-            <div class="tile-value good">${fmt(avgIncome)}</div>
-          </div>
-          <div class="tile">
-            <div class="tile-label">Avg spending</div>
-            <div class="tile-value">${fmt(avgSpend)}</div>
-          </div>
-          <div class="tile span2">
-            <div class="tile-label">Avg surplus · ${n} month${n===1?'':'s'}</div>
-            <div class="tile-value ${avgSurplus>=0?'good':'bad'}">${avgSurplus>=0?'+':''}${fmt(avgSurplus)}</div>
-            <div class="tile-sub">Latest month: ${latest ? escapeHtml(latest.name) : '—'}</div>
-          </div>
+        <div class="hero">
+          <div class="hero-label">Avg surplus · ${n} month${n===1?'':'s'}</div>
+          <div class="hero-value ${avgSurplus>=0?'good':'bad'}">${avgSurplus>=0?'+':''}${fmt(avgSurplus)}</div>
+          <div class="hero-sub">${fmt(avgIncome)} in · ${fmt(avgSpend)} out${latest ? ' · latest ' + escapeHtml(latest.name) : ''}</div>
         </div>
+
+        <div class="section-head">Income vs spending</div>
         <div class="card">
-          <h2>Income vs spending</h2>
           <div class="chart-wrap short">${svgBarChart({
             labels: months.map(m => m.name),
             datasets: [
@@ -861,8 +942,9 @@
             ],
           })}</div>
         </div>
+
+        <div class="section-head">Latest split — ${latest ? escapeHtml(latest.name) : '—'}</div>
         <div class="card">
-          <h2>Category breakdown — ${latest ? escapeHtml(latest.name) : '—'}</h2>
           <div class="chart-wrap tall">${latest ? svgDoughnut({
             labels: ['Main','Optional','Savings','Debt','Car'],
             data: [latest.main, latest.optional, latest.savings, latest.loan, latest.car],
@@ -925,65 +1007,65 @@
     function renderMonthlyDetail() {
       const m = months[selectedMonthIdx];
       if (!m) return;
-      const lineList = (items) => items.length
-        ? items.map(it => `<div class="row"><span class="label">${escapeHtml(it.label || '—')}</span><span>${fmt2(it.amount)}</span></div>`).join('')
-        : '<div class="row"><span class="label">— none —</span><span></span></div>';
-      const accSection = (key, title, total, body) => {
-        const isZero = !total || Math.abs(total) < 0.005;
-        const openClass = isZero ? '' : 'open';
+
+      const subRows = (items) => items.length
+        ? items.map(it => `<div class="sub-row"><span class="sub-label">${escapeHtml(it.label || '—')}</span><span>${fmt2(it.amount)}</span></div>`).join('')
+        : '<div class="sub-row"><span class="sub-label">— none —</span><span></span></div>';
+
+      const listRow = (color, title, total, body) => {
+        const id = 'lr_' + Math.random().toString(36).slice(2, 8);
         return `
-          <div class="acc ${openClass} ${isZero?'zero':''}" data-acc="${key}">
-            <button class="acc-head" type="button">
-              <span class="acc-title">${title}</span>
-              <span class="acc-total">${fmt2(total)}</span>
-              <span class="acc-chev">▼</span>
-            </button>
-            <div class="acc-body">${body}</div>
-          </div>`;
+          <button class="list-row" type="button" data-target="${id}">
+            <span class="lr-dot" style="background:${color}"></span>
+            <span class="lr-main">
+              <span class="lr-title">${title}</span>
+            </span>
+            <span class="lr-amount">${fmt(total)}</span>
+            <span class="lr-chev">▼</span>
+          </button>
+          <div class="list-row-body" id="${id}">${body}</div>
+        `;
       };
 
       $('#monthly-detail').innerHTML = `
-        <div class="bento">
-          <div class="tile">
-            <div class="tile-label">Income</div>
-            <div class="tile-value good">${fmt(m.income)}</div>
-          </div>
-          <div class="tile">
-            <div class="tile-label">Spending</div>
-            <div class="tile-value">${fmt(m.spendTotal)}</div>
-          </div>
-          <div class="tile span2">
-            <div class="tile-label">Remaining</div>
-            <div class="tile-value ${m.surplus>=0?'good':'bad'}">${m.surplus>=0?'+':''}${fmt(m.surplus)}</div>
-          </div>
+        <div class="hero">
+          <div class="hero-label">${escapeHtml(m.name)} · Remaining</div>
+          <div class="hero-value ${m.surplus>=0?'good':'bad'}">${m.surplus>=0?'+':''}${fmt(m.surplus)}</div>
+          <div class="hero-sub">${fmt(m.income)} in · ${fmt(m.spendTotal)} out</div>
         </div>
+
         <div class="card">
-          <h2>${escapeHtml(m.name)} — split</h2>
           <div class="chart-wrap tall">${svgDoughnut({
             labels: ['Main','Optional','Savings','Debt','Car'],
             data: [m.main, m.optional, m.savings, m.loan, m.car],
             colors: [CAT_COLORS.main, CAT_COLORS.optional, CAT_COLORS.savings, CAT_COLORS.debt, CAT_COLORS.car],
             centerLabel: 'Spent',
           })}</div>
-          ${svgLegendHTML([
-            { label: 'Main', color: CAT_COLORS.main },
-            { label: 'Optional', color: CAT_COLORS.optional },
-            { label: 'Savings', color: CAT_COLORS.savings },
-            { label: 'Debt', color: CAT_COLORS.debt },
-            { label: 'Car', color: CAT_COLORS.car },
-          ])}
         </div>
-        ${accSection('income',   'Income',        m.income,    lineList(m.incomeLines))}
-        ${accSection('main',     'Main spending', m.main,      lineList(m.mainLines))}
-        ${accSection('optional', 'Optional',      m.optional,  lineList(m.optionalLines))}
-        ${accSection('savings',  'Savings',       m.savings,   lineList(m.savingsLines))}
-        ${m.loan > 0 ? accSection('debt', 'Debt (Loan)', m.loan, `<div class="row"><span class="label">Monthly debt payment</span><span>${fmt2(m.loan)}</span></div>`) : ''}
-        ${m.car  > 0 ? accSection('car',  'Car',         m.car,  lineList(m.carLines)) : ''}
+
+        <div class="section-head">Income</div>
+        <div class="list">
+          ${listRow(CAT_COLORS.savings, 'Salary', m.income, subRows(m.incomeLines))}
+        </div>
+
+        <div class="section-head">Spending</div>
+        <div class="list">
+          ${listRow(CAT_COLORS.main,     'Main spending', m.main,     subRows(m.mainLines))}
+          ${listRow(CAT_COLORS.optional, 'Optional',      m.optional, subRows(m.optionalLines))}
+          ${listRow(CAT_COLORS.savings,  'Savings',       m.savings,  subRows(m.savingsLines))}
+          ${m.loan > 0 ? listRow(CAT_COLORS.debt, 'Debt (Loan)', m.loan, `<div class="sub-row"><span class="sub-label">Monthly debt payment</span><span>${fmt2(m.loan)}</span></div>`) : ''}
+          ${m.car  > 0 ? listRow(CAT_COLORS.car,  'Car',         m.car,  subRows(m.carLines)) : ''}
+        </div>
       `;
 
-      $('#monthly-detail').querySelectorAll('.acc-head').forEach(h => {
-        h.addEventListener('click', () => {
-          h.closest('.acc').classList.toggle('open');
+      $('#monthly-detail').querySelectorAll('.list-row').forEach(row => {
+        row.addEventListener('click', () => {
+          row.classList.toggle('open');
+          const id = row.dataset.target;
+          if (id) {
+            const body = document.getElementById(id);
+            if (body) body.style.maxHeight = row.classList.contains('open') ? body.scrollHeight + 'px' : '0px';
+          }
         });
       });
     }
@@ -1087,28 +1169,20 @@
       const monthLabels = Array.from({length: maxLen}, (_, i) => String(i));
 
       $('#debt-content').innerHTML = `
-        <div class="bento">
-          <div class="tile">
-            <div class="tile-label">Total balance</div>
-            <div class="tile-value">${fmt(totalBal)}</div>
-          </div>
-          <div class="tile">
-            <div class="tile-label">Monthly payment</div>
-            <div class="tile-value">${fmt(totalMin)}</div>
-          </div>
-          <div class="tile">
-            <div class="tile-label">Debt-free in</div>
-            <div class="tile-value">${withExtra.months} mo</div>
-            <div class="tile-sub">Baseline ${baseline.months} mo</div>
-          </div>
-          <div class="tile">
-            <div class="tile-label">Interest saved</div>
-            <div class="tile-value ${saved>0?'good':''}">${fmt(saved)}</div>
-            <div class="tile-sub">vs no extra payment</div>
-          </div>
+        <div class="hero">
+          <div class="hero-label">Total debt</div>
+          <div class="hero-value">${fmt(totalBal)}</div>
+          <div class="hero-sub">${fmt(totalMin)}/mo · ${withExtra.months} mo to clear${saved > 0 ? ` · ${fmt(saved)} saved` : ''}</div>
         </div>
+
+        <div class="quick-row">
+          <span class="quick-pill"><span class="qp-dot" style="background:var(--bad)"></span>Baseline ${baseline.months} mo</span>
+          <span class="quick-pill"><span class="qp-dot" style="background:var(--good)"></span>With extra ${withExtra.months} mo</span>
+          <span class="quick-pill"><span class="qp-dot" style="background:var(--accent)"></span>+${fmt(extra)}/mo</span>
+        </div>
+
+        <div class="section-head">Payoff projection</div>
         <div class="card">
-          <h2>Payoff projection</h2>
           <div class="chart-wrap short">${svgLineChart({
             labels: monthLabels,
             datasets: [
@@ -1120,10 +1194,10 @@
             <input type="range" id="extra-slider" min="0" max="1000" step="10" value="${extra}">
             <div class="val">+${fmt(extra)}/mo</div>
           </div>
-          <div class="legend">Drag the slider to see how an extra monthly payment shortens the payoff and saves interest (what-if only — doesn't write to the sheet).</div>
         </div>
+
+        <div class="section-head">Accounts</div>
         <div class="card">
-          <h2>Debts</h2>
           <table class="debt-table">
             <thead><tr><th>Name</th><th>Balance</th><th>Monthly</th><th>APR %</th></tr></thead>
             <tbody>
@@ -1187,17 +1261,26 @@
       let cum = 0;
       const cumData = months.map(m => (cum += m.savings));
 
+      const totalSurplus = surplus.reduce((s, v) => s + v, 0);
+      const totalSaved = cumData[cumData.length - 1] || 0;
       $('#trends-content').innerHTML = `
+        <div class="hero">
+          <div class="hero-label">Cumulative savings · ${months.length} mo</div>
+          <div class="hero-value good">${fmt(totalSaved)}</div>
+          <div class="hero-sub">Net surplus over all months: <strong style="color:${totalSurplus>=0?'var(--good)':'var(--bad)'}">${totalSurplus>=0?'+':''}${fmt(totalSurplus)}</strong></div>
+        </div>
+
+        <div class="section-head">Surplus / deficit</div>
         <div class="card">
-          <h2>Surplus / deficit</h2>
           <div class="chart-wrap short">${svgBarChart({
             labels,
             datasets: [{ label: 'Surplus', data: surplus, color: surplusColors }],
             hideLegend: true,
           })}</div>
         </div>
+
+        <div class="section-head">Necessary expenses (stacked)</div>
         <div class="card">
-          <h2>Necessary expenses (stacked)</h2>
           <div class="chart-wrap short">${svgBarChart({
             labels,
             datasets: [
@@ -1208,10 +1291,10 @@
             ],
             stacked: true,
           })}</div>
-          <div class="legend">Main + Debt + Savings (+ Car if active)</div>
         </div>
+
+        <div class="section-head">Cumulative savings</div>
         <div class="card">
-          <h2>Cumulative savings</h2>
           <div class="chart-wrap short">${svgLineChart({
             labels,
             datasets: [{ label: 'Cumulative savings', data: cumData, color: '#4ade80', fill: true }],
