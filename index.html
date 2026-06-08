@@ -1177,6 +1177,42 @@
       return { months: mo, totalInterest: interest, schedule };
     }
 
+    // Android Chrome's native input[type=range] only supports drag if the
+    // touch starts on the thumb — tapping the track just jumps and ends.
+    // This wrapper makes drag work from anywhere on the track.
+    function attachDragSlider(slider) {
+      let dragging = false;
+      const updateFromX = (clientX) => {
+        const rect = slider.getBoundingClientRect();
+        if (rect.width <= 0) return;
+        const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+        const pct = x / rect.width;
+        const min = +slider.min || 0;
+        const max = +slider.max || 100;
+        const step = +slider.step || 1;
+        const raw = min + pct * (max - min);
+        const stepped = Math.round(raw / step) * step;
+        const clamped = Math.max(min, Math.min(max, stepped));
+        if (+slider.value !== clamped) {
+          slider.value = clamped;
+          slider.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      };
+      slider.addEventListener('touchstart', (e) => {
+        dragging = true;
+        updateFromX(e.touches[0].clientX);
+        e.preventDefault();
+      }, { passive: false });
+      slider.addEventListener('touchmove', (e) => {
+        if (!dragging) return;
+        updateFromX(e.touches[0].clientX);
+        e.preventDefault();
+      }, { passive: false });
+      const end = () => { dragging = false; };
+      slider.addEventListener('touchend', end);
+      slider.addEventListener('touchcancel', end);
+    }
+
     function payoffChartSVG(baseline, withExtra, extra) {
       const maxLen = Math.max(baseline.schedule.length, withExtra.schedule.length);
       const monthLabels = Array.from({length: maxLen}, (_, i) => String(i));
@@ -1258,6 +1294,7 @@
         saveExtra(+e.target.value);
         updateDebtPayoff(); // light-touch: only updates chart + label, keeps slider intact
       });
+      attachDragSlider($('#extra-slider'));
       $('#debt-content').querySelectorAll('input[data-f]').forEach(inp => {
         inp.addEventListener('change', async () => {
           const i = +inp.dataset.i;
