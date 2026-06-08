@@ -74,19 +74,33 @@
     .stat-value { font-size: 20px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
     .stat-value.good { color: var(--good); }
     .stat-value.bad { color: var(--bad); }
-    .month-list { display: flex; flex-direction: column; gap: 8px; }
-    .month-row {
-      display: grid; grid-template-columns: 1fr auto;
-      gap: 10px; align-items: center;
-      padding: 10px 12px; background: var(--panel-2);
-      border-radius: 8px; cursor: pointer; border: 1px solid transparent;
+    .year-tabs {
+      display: flex; gap: 8px; margin-bottom: 12px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      padding-bottom: 4px;
     }
-    .month-row.selected { border-color: var(--accent); }
-    .month-row .name { font-weight: 500; }
-    .month-row .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-    .month-row .amount { font-weight: 600; font-variant-numeric: tabular-nums; }
-    .month-row .amount.good { color: var(--good); }
-    .month-row .amount.bad { color: var(--bad); }
+    .year-tabs button {
+      padding: 8px 16px; background: var(--panel); color: var(--muted);
+      border: 1px solid var(--line); border-radius: 999px; font-size: 14px;
+      font-weight: 500; white-space: nowrap; flex-shrink: 0;
+    }
+    .year-tabs button.active {
+      background: var(--accent); color: white; border-color: var(--accent);
+    }
+    .month-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+      margin-bottom: 16px;
+    }
+    .month-chip {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 14px 4px; background: var(--panel); border: 1px solid var(--line);
+      border-radius: 10px; gap: 4px; min-height: 64px;
+    }
+    .month-chip.selected { border-color: var(--accent); background: var(--panel-2); }
+    .month-chip .m { font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: 0.5px; }
+    .month-chip .s { font-size: 11px; font-variant-numeric: tabular-nums; }
+    .month-chip.good .s { color: var(--good); }
+    .month-chip.bad .s { color: var(--bad); }
     .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; gap: 12px; }
     .row:last-child { border-bottom: none; }
     .row .label { color: var(--muted); }
@@ -119,11 +133,26 @@
       font: inherit; margin-top: 4px;
     }
     .line-item {
-      display: grid; grid-template-columns: 1fr 110px;
-      gap: 8px; align-items: center; padding: 4px 0;
+      display: grid; grid-template-columns: 1fr 100px 36px;
+      gap: 6px; align-items: center; padding: 3px 0;
       font-size: 14px;
     }
-    .line-item input { margin-top: 0; padding: 6px 8px; }
+    .line-item input { margin-top: 0; padding: 8px; }
+    .line-item input[type=number] { text-align: right; font-variant-numeric: tabular-nums; }
+    .nm-del {
+      width: 36px; height: 36px; padding: 0;
+      background: var(--panel-2); color: var(--muted);
+      border: 1px solid var(--line); border-radius: 6px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 20px; line-height: 1;
+    }
+    .nm-del:active { background: var(--bad); color: white; border-color: var(--bad); }
+    .nm-add {
+      background: transparent; color: var(--accent);
+      border: 1px dashed var(--accent);
+      font-size: 13px; padding: 8px 14px; width: 100%;
+    }
+    .nm-add:active { background: var(--panel-2); }
     .toggle { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
     .toggle input { width: 18px; height: 18px; }
     .toast {
@@ -209,9 +238,11 @@
     // STATE
     // ============================================================
     let months = [];
+    let template = null; // parsed Template tab, used as defaults for "+ New month"
     let tokenClient = null;
     let chartInstances = {};
     let selectedMonthIdx = -1;
+    let selectedYear = null;
 
     // ============================================================
     // UTILS
@@ -280,14 +311,17 @@
           $('#trends-content').innerHTML = '';
           return;
         }
-        const ranges = monthNames.map(n => `'${n.replace(/'/g, "''")}'!A1:N40`);
+        const allNames = [...monthNames, 'Template'];
+        const ranges = allNames.map(n => `'${n.replace(/'/g, "''")}'!A1:N40`);
         const valUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchGet?key=${API_KEY}&valueRenderOption=UNFORMATTED_VALUE&` +
           ranges.map(r => 'ranges=' + encodeURIComponent(r)).join('&');
         const valRes = await fetch(valUrl);
         if (!valRes.ok) throw new Error('Sheet values HTTP ' + valRes.status);
         const val = await valRes.json();
-        months = val.valueRanges.map((vr, i) => parseMonthData(monthNames[i], vr.values || []));
+        months = monthNames.map((n, i) => parseMonthData(n, val.valueRanges[i].values || []));
         months.sort((a, b) => a.dateKey - b.dateKey);
+        const templateGrid = val.valueRanges[monthNames.length].values || [];
+        template = parseMonthData('Template', templateGrid);
         renderAll();
       } catch (e) {
         console.error(e);
@@ -411,25 +445,45 @@
     }
 
     function renderMonthly() {
-      if (selectedMonthIdx < 0 || selectedMonthIdx >= months.length) selectedMonthIdx = months.length - 1;
+      if (!months.length) {
+        $('#monthly-content').innerHTML = '<div class="loading">No months loaded.</div>';
+        return;
+      }
+      // Group months by year
+      const byYear = {};
+      for (const m of months) {
+        const y = m.dateKey.getFullYear();
+        (byYear[y] = byYear[y] || []).push(m);
+      }
+      const years = Object.keys(byYear).map(Number).sort((a, b) => a - b);
+      if (!selectedYear || !byYear[selectedYear]) selectedYear = years[years.length - 1];
+
+      // If current selection isn't in the visible year, pick the latest month in that year
+      const inYear = byYear[selectedYear];
+      const currentInYear = selectedMonthIdx >= 0 && months[selectedMonthIdx] &&
+        months[selectedMonthIdx].dateKey.getFullYear() === selectedYear;
+      if (!currentInYear) selectedMonthIdx = months.indexOf(inYear[inYear.length - 1]);
+
       $('#monthly-content').innerHTML = `
-        <div class="card">
-          <h2>Months</h2>
-          <div class="month-list">
-            ${months.map((m, i) => `
-              <div class="month-row ${i===selectedMonthIdx?'selected':''}" data-i="${i}">
-                <div>
-                  <div class="name">${escapeHtml(m.name)}</div>
-                  <div class="sub">${fmt(m.income)} in · ${fmt(m.spendTotal)} out${m.loan>0 ? ' (incl. ' + fmt(m.loan) + ' debt)' : ''}</div>
-                </div>
-                <div class="amount ${m.surplus>=0?'good':'bad'}">${m.surplus>=0?'+':''}${fmt(m.surplus)}</div>
-              </div>
-            `).join('')}
-          </div>
+        <div class="year-tabs">
+          ${years.map(y => `<button data-year="${y}" class="${y===selectedYear?'active':''}">${y}</button>`).join('')}
+        </div>
+        <div class="month-grid">
+          ${inYear.map(m => {
+            const i = months.indexOf(m);
+            const mon = MONTH_NAMES[m.dateKey.getMonth()];
+            return `<button class="month-chip ${i===selectedMonthIdx?'selected':''} ${m.surplus>=0?'good':'bad'}" data-i="${i}">
+              <span class="m">${mon}</span>
+              <span class="s">${m.surplus>=0?'+':''}${fmt(m.surplus)}</span>
+            </button>`;
+          }).join('')}
         </div>
         <div id="monthly-detail"></div>
       `;
-      $('#monthly-content').querySelectorAll('.month-row').forEach(el => {
+      $('#monthly-content').querySelectorAll('.year-tabs button').forEach(el => {
+        el.addEventListener('click', () => { selectedYear = +el.dataset.year; renderMonthly(); });
+      });
+      $('#monthly-content').querySelectorAll('.month-chip').forEach(el => {
         el.addEventListener('click', () => { selectedMonthIdx = +el.dataset.i; renderMonthly(); });
       });
       renderMonthlyDetail();
@@ -481,17 +535,64 @@
     // ============================================================
     // DEBT
     // ============================================================
-    function loadDebts() {
-      try {
-        const saved = localStorage.getItem('debts');
-        if (!saved) return DEFAULT_DEBTS.map(d => ({...d}));
-        const parsed = JSON.parse(saved);
-        return Array.isArray(parsed) && parsed.length ? parsed : DEFAULT_DEBTS.map(d => ({...d}));
-      } catch { return DEFAULT_DEBTS.map(d => ({...d})); }
+    // debtsState comes from the sheet (Debt!A3:C6).
+    // APRs live in localStorage (the sheet has no APR column).
+    let debtsState = DEFAULT_DEBTS.map(d => ({...d}));
+
+    function loadAprs() {
+      try { return JSON.parse(localStorage.getItem('debtAprs') || '{}'); }
+      catch { return {}; }
     }
-    function saveDebts(d) { localStorage.setItem('debts', JSON.stringify(d)); }
+    function saveAprs(map) { localStorage.setItem('debtAprs', JSON.stringify(map)); }
+    function aprFor(name) {
+      const m = loadAprs();
+      if (name in m) return +m[name];
+      const def = DEFAULT_DEBTS.find(d => d.name.toLowerCase() === name.toLowerCase());
+      return def ? def.apr : 24;
+    }
+    function setApr(name, v) {
+      const m = loadAprs();
+      m[name] = +v || 0;
+      saveAprs(m);
+    }
     function loadExtra() { return +(localStorage.getItem('extraPayment') || 0); }
     function saveExtra(v) { localStorage.setItem('extraPayment', String(v)); }
+
+    async function loadDebtsFromSheet() {
+      if (API_KEY.startsWith('PASTE_')) return;
+      try {
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/Debt!A3:C6?key=${API_KEY}&valueRenderOption=UNFORMATTED_VALUE`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Debt HTTP ' + res.status);
+        const data = await res.json();
+        const rows = data.values || [];
+        debtsState = rows
+          .filter(r => r && String(r[0] || '').trim())
+          .map(r => {
+            const name = String(r[0]).trim();
+            return { name, balance: num(r[1]), monthly: num(r[2]), apr: aprFor(name) };
+          });
+        renderDebt();
+      } catch (e) {
+        console.error('Debt load:', e);
+      }
+    }
+
+    async function writeDebtCell(rowIndex, col, value) {
+      // rowIndex is 0-based index into debtsState; sheet rows are 3..6.
+      const sheetRow = rowIndex + 3;
+      const range = `Debt!${col}${sheetRow}`;
+      const token = await getAccessToken();
+      const res = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+        {
+          method: 'PUT',
+          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: [[value]] }),
+        }
+      );
+      if (!res.ok) throw new Error('Sheet write ' + res.status + ': ' + (await res.text()));
+    }
 
     function avalanche(debts, extra) {
       let d = debts.map(x => ({ balance: +x.balance, monthly: +x.monthly, apr: +x.apr })).filter(x => x.balance > 0);
@@ -523,7 +624,7 @@
     }
 
     function renderDebt() {
-      const debts = loadDebts();
+      const debts = debtsState;
       const extra = loadExtra();
       const baseline = avalanche(debts, 0);
       const withExtra = avalanche(debts, extra);
@@ -541,7 +642,7 @@
           </div>
         </div>
         <div class="card">
-          <h2>Extra payment</h2>
+          <h2>Extra payment (what-if)</h2>
           <div class="slider-row">
             <input type="range" id="extra-slider" min="0" max="1000" step="10" value="${extra}">
             <div class="val">+${fmt(extra)}/mo</div>
@@ -550,21 +651,21 @@
             With extra: ${withExtra.months} mo · ${fmt(withExtra.totalInterest)} interest</div>
         </div>
         <div class="card">
-          <h2>Debts (edit APRs &amp; balances)</h2>
+          <h2>Debts</h2>
           <table class="debt-table">
             <thead><tr><th>Name</th><th>Balance</th><th>Monthly</th><th>APR %</th></tr></thead>
             <tbody>
               ${debts.map((x, i) => `
                 <tr>
                   <td>${escapeHtml(x.name)}</td>
-                  <td><input type="number" data-f="balance" data-i="${i}" value="${x.balance}" step="1"></td>
-                  <td><input type="number" data-f="monthly" data-i="${i}" value="${x.monthly}" step="1"></td>
-                  <td><input type="number" data-f="apr"     data-i="${i}" value="${x.apr}"     step="0.1"></td>
+                  <td><input type="number" data-f="balance" data-i="${i}" value="${x.balance}" step="1" inputmode="decimal"></td>
+                  <td><input type="number" data-f="monthly" data-i="${i}" value="${x.monthly}" step="1" inputmode="decimal"></td>
+                  <td><input type="number" data-f="apr"     data-i="${i}" value="${x.apr}"     step="0.1" inputmode="decimal"></td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
-          <div class="legend">Changes are saved on this device only.</div>
+          <div class="legend">Balance &amp; Monthly write to the sheet (Google sign-in required). APR is saved on this device only.</div>
         </div>
         <div class="card">
           <h2>Payoff projection</h2>
@@ -576,12 +677,31 @@
         renderDebt();
       });
       $('#debt-content').querySelectorAll('input[data-f]').forEach(inp => {
-        inp.addEventListener('change', () => {
-          const d = loadDebts();
+        inp.addEventListener('change', async () => {
           const i = +inp.dataset.i;
-          d[i][inp.dataset.f] = +inp.value || 0;
-          saveDebts(d);
+          const field = inp.dataset.f;
+          const v = +inp.value || 0;
+          const debt = debtsState[i]; if (!debt) return;
+          if (field === 'apr') {
+            debt.apr = v;
+            setApr(debt.name, v);
+            renderDebt();
+            return;
+          }
+          // balance or monthly → write to sheet
+          const colMap = { balance: 'B', monthly: 'C' };
+          const prev = debt[field];
+          debt[field] = v;
           renderDebt();
+          try {
+            await writeDebtCell(i, colMap[field], v);
+            showToast('Saved ' + debt.name + ' ' + field);
+          } catch (e) {
+            console.error(e);
+            debt[field] = prev; // rollback
+            renderDebt();
+            showToast('Save failed: ' + e.message, 4000);
+          }
         });
       });
       destroyChart('payoff');
@@ -694,43 +814,112 @@
 
     $('#new-month-btn').addEventListener('click', openNewMonth);
 
+    // Per-section state for the "+ New month" modal.
+    // Each entry: { label, amount, fromTemplate: bool }
+    let nmState = null;
+    const SECTIONS = [
+      { key: 'income',   title: 'Salary',        seedKey: 'incomeLines' },
+      { key: 'main',     title: 'Main spending', seedKey: 'mainLines' },
+      { key: 'optional', title: 'Optional',      seedKey: 'optionalLines' },
+      { key: 'savings',  title: 'Savings',       seedKey: 'savingsLines' },
+      { key: 'car',      title: 'Car',           seedKey: 'carLines' },
+    ];
+
     function openNewMonth() {
       if (CLIENT_ID.startsWith('PASTE_')) {
         showToast('Set CLIENT_ID in index.html first (SETUP_GUIDE step 4–5)', 4000);
         return;
       }
-      const seed = months[months.length - 1];
+      if (!template) {
+        showToast('Template not loaded yet — wait for sheet to load and try again', 4000);
+        return;
+      }
+      nmState = {};
+      for (const s of SECTIONS) {
+        nmState[s.key] = (template[s.seedKey] || []).map(it => ({
+          label: it.label, amount: it.amount, fromTemplate: true,
+        }));
+      }
+      nmState.carIncluded = false;
       const today = new Date();
-      const defaultName = MONTH_NAMES[today.getMonth()] + ' ' + today.getFullYear();
-      const lineRows = (items, key) => items.length ? items.map((it, i) =>
-        `<div class="line-item">
-          <span>${escapeHtml(it.label || '(unlabeled)')}</span>
-          <input type="number" step="0.01" data-section="${key}" data-i="${i}" value="0" inputmode="decimal">
-        </div>`).join('') : '<div class="legend">No items in template.</div>';
+      $('#modal-new-month').classList.add('open');
+      renderNewMonth(MONTH_NAMES[today.getMonth()] + ' ' + today.getFullYear());
+    }
 
+    function renderNewMonth(nameValue) {
+      const sectionCard = (sec) => {
+        const rows = nmState[sec.key].map((it, i) => `
+          <div class="line-item">
+            <input type="text" data-section="${sec.key}" data-i="${i}" data-f="label" value="${escapeHtml(it.label)}" placeholder="Item">
+            <input type="number" step="0.01" inputmode="decimal" data-section="${sec.key}" data-i="${i}" data-f="amount" value="${it.amount}">
+            <button class="nm-del" data-section="${sec.key}" data-i="${i}" title="Remove row" aria-label="Remove">×</button>
+          </div>`).join('');
+        const isCar = sec.key === 'car';
+        const carAttrs = isCar ? ` id="nm-car-card" style="display:${nmState.carIncluded ? 'block' : 'none'}"` : '';
+        return `
+          <div class="card"${carAttrs}>
+            <h2>${sec.title}</h2>
+            <div class="nm-lines">${rows || '<div class="legend">No items.</div>'}</div>
+            <button class="nm-add" data-section="${sec.key}" style="margin-top:8px">+ Add row</button>
+          </div>`;
+      };
       $('#new-month-body').innerHTML = `
         <label>Month name</label>
-        <input type="text" id="nm-name" value="${escapeHtml(defaultName)}" autocomplete="off">
-        ${seed ? `
-          <div class="card" style="margin-top:14px"><h2>Main spending</h2>${lineRows(seed.mainLines, 'main')}</div>
-          <div class="card"><h2>Optional</h2>${lineRows(seed.optionalLines, 'optional')}</div>
-          <div class="card"><h2>Savings</h2>${lineRows(seed.savingsLines, 'savings')}</div>
-          <div class="toggle"><input type="checkbox" id="nm-car"><label for="nm-car" style="margin:0">Include Car this month</label></div>
-          <div class="card" id="nm-car-card" style="display:none"><h2>Car</h2>${lineRows(seed.carLines, 'car')}</div>
-        ` : `<div class="err">No existing month to copy labels from. Open your sheet and create one manually first.</div>`}
+        <input type="text" id="nm-name" value="${escapeHtml(nameValue || '')}" autocomplete="off">
+        ${sectionCard(SECTIONS[0])}
+        ${sectionCard(SECTIONS[1])}
+        ${sectionCard(SECTIONS[2])}
+        ${sectionCard(SECTIONS[3])}
+        <div class="toggle">
+          <input type="checkbox" id="nm-car" ${nmState.carIncluded?'checked':''}>
+          <label for="nm-car" style="margin:0">Include Car this month</label>
+        </div>
+        ${sectionCard(SECTIONS[4])}
+        <div class="legend" style="margin:10px 0">Defaults come from your <strong>Template</strong> tab — change any amount or label, add or remove rows, and only the changes will be written.</div>
         <div style="display:flex;gap:10px;margin-top:16px">
           <button id="nm-cancel" style="flex:1">Cancel</button>
-          <button id="nm-create" class="primary" style="flex:1" ${seed?'':'disabled'}>Create month</button>
+          <button id="nm-create" class="primary" style="flex:1">Create month</button>
         </div>
       `;
-      $('#modal-new-month').classList.add('open');
-      const carToggle = $('#nm-car');
-      if (carToggle) carToggle.addEventListener('change', () => {
-        $('#nm-car-card').style.display = carToggle.checked ? '' : 'none';
+      // Wire up handlers
+      $('#new-month-body').querySelectorAll('input[data-section]').forEach(inp => {
+        inp.addEventListener('input', () => {
+          const sec = inp.dataset.section, i = +inp.dataset.i, f = inp.dataset.f;
+          nmState[sec][i][f] = f === 'amount' ? (+inp.value || 0) : inp.value;
+        });
+      });
+      $('#new-month-body').querySelectorAll('.nm-add').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const sec = btn.dataset.section;
+          nmState[sec].push({ label: '', amount: 0, fromTemplate: false });
+          renderNewMonth($('#nm-name').value);
+        });
+      });
+      $('#new-month-body').querySelectorAll('.nm-del').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const sec = btn.dataset.section, i = +btn.dataset.i;
+          nmState[sec].splice(i, 1);
+          renderNewMonth($('#nm-name').value);
+        });
+      });
+      $('#nm-car').addEventListener('change', (e) => {
+        nmState.carIncluded = e.target.checked;
+        $('#nm-car-card').style.display = e.target.checked ? 'block' : 'none';
       });
       $('#nm-cancel').addEventListener('click', () => $('#modal-new-month').classList.remove('open'));
-      if (seed) $('#nm-create').addEventListener('click', createMonth);
+      $('#nm-create').addEventListener('click', createMonth);
     }
+
+    // Sheet layout for WRITING a new month. expandable=true means we can
+    // insertRange in the section's column slice to extend the SUM range
+    // without disturbing other sections.
+    const SECTION_DEFS = {
+      income:   { startRow: 2,  endRow: 6,  labelCol: 'C', amountCol: 'D', expandable: false },
+      main:     { startRow: 11, endRow: 32, labelCol: 'C', amountCol: 'D', expandable: true },
+      optional: { startRow: 11, endRow: 13, labelCol: 'F', amountCol: 'G', expandable: true },
+      savings:  { startRow: 11, endRow: 17, labelCol: 'I', amountCol: 'J', expandable: true },
+      car:      { startRow: 11, endRow: 17, labelCol: 'L', amountCol: 'M', expandable: true },
+    };
 
     async function createMonth() {
       const btn = $('#nm-create');
@@ -740,56 +929,92 @@
         if (!newName) throw new Error('Month name required');
         if (months.some(m => m.name === newName)) throw new Error('A month with that name already exists');
 
-        const collect = (key) => Array.from(document.querySelectorAll(`#new-month-body input[data-section="${key}"]`))
-          .map(i => +i.value || 0);
-        const mainAmts = collect('main');
-        const optAmts  = collect('optional');
-        const savAmts  = collect('savings');
-        const carAmts  = $('#nm-car') && $('#nm-car').checked ? collect('car') : null;
-
         const token = await getAccessToken();
         const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?key=${API_KEY}&fields=sheets.properties(sheetId,title)`);
         if (!metaRes.ok) throw new Error('Sheet metadata HTTP ' + metaRes.status);
         const meta = await metaRes.json();
-        const template = meta.sheets.find(s => s.properties.title === 'Template');
-        if (!template) throw new Error('"Template" tab not found in spreadsheet');
+        const tmplMeta = meta.sheets.find(s => s.properties.title === 'Template');
+        if (!tmplMeta) throw new Error('"Template" tab not found in spreadsheet');
 
+        // 1. Duplicate Template -> new tab
         const dupRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
           body: JSON.stringify({ requests: [{
-            duplicateSheet: { sourceSheetId: template.properties.sheetId, newSheetName: newName, insertSheetIndex: 1 }
+            duplicateSheet: { sourceSheetId: tmplMeta.properties.sheetId, newSheetName: newName, insertSheetIndex: 1 }
           }] }),
         });
-        if (!dupRes.ok) {
-          const t = await dupRes.text();
-          throw new Error('Duplicate failed: ' + t);
-        }
+        if (!dupRes.ok) throw new Error('Duplicate failed: ' + (await dupRes.text()));
+        const dupJson = await dupRes.json();
+        const newSheetId = dupJson.replies[0].duplicateSheet.properties.sheetId;
 
-        const data = [];
-        const pushRange = (col, startRow, amounts) => {
-          if (!amounts || !amounts.length) return;
-          data.push({
-            range: `'${newName.replace(/'/g, "''")}'!${col}${startRow}:${col}${startRow + amounts.length - 1}`,
-            values: amounts.map(v => [v]),
-          });
-        };
-        pushRange('D', 11, mainAmts);
-        pushRange('G', 11, optAmts);
-        pushRange('J', 11, savAmts);
-        if (carAmts) pushRange('M', 11, carAmts);
-
-        if (data.length) {
-          const upRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchUpdate`, {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ valueInputOption: 'USER_ENTERED', data }),
-          });
-          if (!upRes.ok) {
-            const t = await upRes.text();
-            throw new Error('Write failed: ' + t);
+        // 2. Apply insertRange for any expandable section needing extra rows.
+        // We only shift the section's own 2-column slice, so sections in different
+        // columns don't interfere with each other.
+        const insertRequests = [];
+        for (const [key, def] of Object.entries(SECTION_DEFS)) {
+          if (key === 'car' && !nmState.carIncluded) continue;
+          const items = nmState[key] || [];
+          const templateLen = def.endRow - def.startRow + 1;
+          const extra = items.length - templateLen;
+          if (def.expandable && extra > 0) {
+            insertRequests.push({
+              insertRange: {
+                range: {
+                  sheetId: newSheetId,
+                  startRowIndex: def.endRow - 1,
+                  endRowIndex: def.endRow - 1 + extra,
+                  startColumnIndex: colIdx(def.labelCol),
+                  endColumnIndex: colIdx(def.amountCol) + 1,
+                },
+                shiftDimension: 'ROWS',
+              },
+            });
           }
         }
+        if (insertRequests.length) {
+          const insRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requests: insertRequests }),
+          });
+          if (!insRes.ok) throw new Error('Insert rows failed: ' + (await insRes.text()));
+        }
+
+        // 3. Write labels + amounts for each section, padding/clearing as needed.
+        const escName = newName.replace(/'/g, "''");
+        const data = [];
+        for (const [key, def] of Object.entries(SECTION_DEFS)) {
+          if (key === 'car' && !nmState.carIncluded) {
+            // Clear car section so the duplicated template values don't carry over.
+            const blankLen = def.endRow - def.startRow + 1;
+            data.push({
+              range: `'${escName}'!${def.labelCol}${def.startRow}:${def.amountCol}${def.startRow + blankLen - 1}`,
+              values: Array.from({ length: blankLen }, () => ['', '']),
+            });
+            continue;
+          }
+          const items = nmState[key] || [];
+          const templateLen = def.endRow - def.startRow + 1;
+          const len = def.expandable ? Math.max(items.length, templateLen) : templateLen;
+          const rows = [];
+          for (let i = 0; i < len; i++) {
+            const it = items[i];
+            rows.push(it ? [it.label, it.amount] : ['', '']);
+          }
+          data.push({
+            range: `'${escName}'!${def.labelCol}${def.startRow}:${def.amountCol}${def.startRow + len - 1}`,
+            values: rows,
+          });
+        }
+
+        const upRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchUpdate`, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ valueInputOption: 'USER_ENTERED', data }),
+        });
+        if (!upRes.ok) throw new Error('Write failed: ' + (await upRes.text()));
+
         $('#modal-new-month').classList.remove('open');
         showToast('Created ' + newName);
         await loadMonths();
@@ -813,6 +1038,7 @@
     // ============================================================
     renderDebt();
     loadMonths();
+    loadDebtsFromSheet();
   </script>
 </body>
 </html>
