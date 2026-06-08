@@ -1177,6 +1177,35 @@
       return { months: mo, totalInterest: interest, schedule };
     }
 
+    function payoffChartSVG(baseline, withExtra, extra) {
+      const maxLen = Math.max(baseline.schedule.length, withExtra.schedule.length);
+      const monthLabels = Array.from({length: maxLen}, (_, i) => String(i));
+      return svgLineChart({
+        labels: monthLabels,
+        datasets: [
+          { label: 'Baseline', data: baseline.schedule.map(s => s.remaining), color: '#f87171', fill: true },
+          { label: `+${fmt(extra)}/mo`, data: withExtra.schedule.map(s => s.remaining), color: '#4ade80', fill: true },
+        ],
+      });
+    }
+
+    // Light-touch update during slider drag — keeps the slider DOM intact.
+    function updateDebtPayoff() {
+      const debts = debtsState;
+      const extra = loadExtra();
+      const baseline = avalanche(debts, 0);
+      const withExtra = avalanche(debts, extra);
+      const saved = baseline.totalInterest - withExtra.totalInterest;
+      const totalMin = debts.reduce((s, x) => s + x.monthly, 0);
+
+      const body = $('#payoff-chart-body');
+      if (body) body.innerHTML = payoffChartSVG(baseline, withExtra, extra);
+      const mo = $('#payoff-mo'); if (mo) mo.textContent = withExtra.months + ' mo';
+      const val = $('#extra-val'); if (val) val.textContent = '+' + fmt(extra) + '/mo';
+      const sub = $('#debt-hero-sub');
+      if (sub) sub.textContent = fmt(totalMin) + '/mo · ' + withExtra.months + ' mo to clear' + (saved > 0 ? ' · ' + fmt(saved) + ' saved' : '');
+    }
+
     function renderDebt() {
       const debts = debtsState;
       const extra = loadExtra();
@@ -1185,34 +1214,26 @@
       const saved = baseline.totalInterest - withExtra.totalInterest;
       const totalBal = debts.reduce((s, x) => s + x.balance, 0);
       const totalMin = debts.reduce((s, x) => s + x.monthly, 0);
-      const maxLen = Math.max(baseline.schedule.length, withExtra.schedule.length);
-      const monthLabels = Array.from({length: maxLen}, (_, i) => String(i));
 
       $('#debt-content').innerHTML = `
         <div class="hero">
           <div class="hero-label">Total debt</div>
           <div class="hero-value">${fmt(totalBal)}</div>
-          <div class="hero-sub">${fmt(totalMin)}/mo · ${withExtra.months} mo to clear${saved > 0 ? ` · ${fmt(saved)} saved` : ''}</div>
+          <div class="hero-sub" id="debt-hero-sub">${fmt(totalMin)}/mo · ${withExtra.months} mo to clear${saved > 0 ? ` · ${fmt(saved)} saved` : ''}</div>
         </div>
 
         <div class="chart-card">
           <div class="chart-head">
             <div class="chart-title">Payoff projection</div>
             <div class="chart-value">
-              <span class="chart-num good">${withExtra.months} mo</span>
+              <span class="chart-num good" id="payoff-mo">${withExtra.months} mo</span>
               <span class="chart-sub">to clear</span>
             </div>
           </div>
-          <div class="chart-body">${svgLineChart({
-            labels: monthLabels,
-            datasets: [
-              { label: 'Baseline', data: baseline.schedule.map(s => s.remaining), color: '#f87171', fill: true },
-              { label: `+${fmt(extra)}/mo`, data: withExtra.schedule.map(s => s.remaining), color: '#4ade80', fill: true },
-            ],
-          })}</div>
+          <div class="chart-body" id="payoff-chart-body">${payoffChartSVG(baseline, withExtra, extra)}</div>
           <div class="slider-row" style="margin-top:14px">
             <input type="range" id="extra-slider" min="0" max="1000" step="10" value="${extra}">
-            <div class="val">+${fmt(extra)}/mo</div>
+            <div class="val" id="extra-val">+${fmt(extra)}/mo</div>
           </div>
         </div>
 
@@ -1235,7 +1256,7 @@
       `;
       $('#extra-slider').addEventListener('input', (e) => {
         saveExtra(+e.target.value);
-        renderDebt();
+        updateDebtPayoff(); // light-touch: only updates chart + label, keeps slider intact
       });
       $('#debt-content').querySelectorAll('input[data-f]').forEach(inp => {
         inp.addEventListener('change', async () => {
