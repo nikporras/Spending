@@ -1280,17 +1280,32 @@
         if (months.some(m => m.name === newName)) throw new Error('A month with that name already exists');
 
         const token = await getAccessToken();
-        const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?key=${API_KEY}&fields=sheets.properties(sheetId,title)`);
+        const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?key=${API_KEY}&fields=sheets.properties(sheetId,title,index)`);
         if (!metaRes.ok) throw new Error('Sheet metadata HTTP ' + metaRes.status);
         const meta = await metaRes.json();
         const tmplMeta = meta.sheets.find(s => s.properties.title === 'Template');
         if (!tmplMeta) throw new Error('"Template" tab not found in spreadsheet');
 
+        // Insert chronologically: right after the latest month tab whose date <= newDate.
+        // Falls back to position 1 if no other month tabs exist.
+        const newDate = parseMonth(newName);
+        let insertIdx = 1;
+        if (newDate) {
+          let lastEarlierIdx = -1;
+          for (const s of meta.sheets) {
+            const d = parseMonth(s.properties.title);
+            if (d && d <= newDate && s.properties.index > lastEarlierIdx) {
+              lastEarlierIdx = s.properties.index;
+            }
+          }
+          if (lastEarlierIdx >= 0) insertIdx = lastEarlierIdx + 1;
+        }
+
         const dupRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
           body: JSON.stringify({ requests: [{
-            duplicateSheet: { sourceSheetId: tmplMeta.properties.sheetId, newSheetName: newName, insertSheetIndex: 1 }
+            duplicateSheet: { sourceSheetId: tmplMeta.properties.sheetId, newSheetName: newName, insertSheetIndex: insertIdx }
           }] }),
         });
         if (!dupRes.ok) throw new Error('Duplicate failed: ' + (await dupRes.text()));
