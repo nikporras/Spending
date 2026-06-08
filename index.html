@@ -109,6 +109,69 @@
     .stat-value.good { color: var(--good); }
     .stat-value.bad { color: var(--bad); }
 
+    /* === Bento tiles === */
+    .bento {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+      margin-bottom: 12px;
+    }
+    .bento .tile {
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 14px; padding: 14px;
+      display: flex; flex-direction: column; gap: 4px;
+      min-height: 76px;
+    }
+    .bento .tile.span2 { grid-column: span 2; }
+    .bento .tile .tile-label {
+      font-size: 11px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .bento .tile .tile-value {
+      font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums;
+    }
+    .bento .tile.span2 .tile-value { font-size: 26px; }
+    .bento .tile .tile-value.good { color: var(--good); }
+    .bento .tile .tile-value.bad { color: var(--bad); }
+    .bento .tile .tile-sub {
+      font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; margin-top: 2px;
+    }
+
+    /* === Accordion (Monthly tab) === */
+    .acc {
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 12px; margin-bottom: 8px; overflow: hidden;
+    }
+    .acc-head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px; cursor: pointer;
+      background: transparent; border: none; width: 100%;
+      color: inherit; font: inherit; border-radius: 0;
+      min-height: 56px;
+    }
+    .acc-head:active { background: var(--panel-2); transform: none; }
+    .acc-title {
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      text-align: left; flex: 1;
+    }
+    .acc-total {
+      font-size: 16px; font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .acc-chev {
+      font-size: 11px; color: var(--muted);
+      transition: transform 0.18s;
+      width: 14px; text-align: center;
+    }
+    .acc.open .acc-chev { transform: rotate(180deg); color: var(--accent); }
+    .acc.open .acc-title { color: var(--text); }
+    .acc-body {
+      padding: 0 14px;
+      max-height: 0; overflow: hidden;
+      transition: max-height 0.22s ease-out, padding 0.22s;
+    }
+    .acc.open .acc-body { max-height: 4000px; padding: 0 14px 14px; }
+    .acc.zero .acc-total { color: var(--muted); opacity: 0.55; }
+
     /* === Year tabs & month grid === */
     .year-tabs {
       display: flex; gap: 8px; margin-bottom: 12px;
@@ -773,13 +836,19 @@
       const avgIncome = avg('income'), avgSpend = avg('spendTotal'), avgSurplus = avg('surplus');
       const latest = months[months.length - 1];
       $('#overview-content').innerHTML = `
-        <div class="card">
-          <h2>Averages (${n} month${n===1?'':'s'})</h2>
-          <div class="stat-grid">
-            <div class="stat"><div class="stat-label">Avg income</div><div class="stat-value">${fmt(avgIncome)}</div></div>
-            <div class="stat"><div class="stat-label">Avg spending</div><div class="stat-value">${fmt(avgSpend)}</div></div>
-            <div class="stat"><div class="stat-label">Avg surplus</div><div class="stat-value ${avgSurplus>=0?'good':'bad'}">${fmt(avgSurplus)}</div></div>
-            <div class="stat"><div class="stat-label">Latest</div><div class="stat-value">${latest ? latest.name : '—'}</div></div>
+        <div class="bento">
+          <div class="tile">
+            <div class="tile-label">Avg income</div>
+            <div class="tile-value good">${fmt(avgIncome)}</div>
+          </div>
+          <div class="tile">
+            <div class="tile-label">Avg spending</div>
+            <div class="tile-value">${fmt(avgSpend)}</div>
+          </div>
+          <div class="tile span2">
+            <div class="tile-label">Avg surplus · ${n} month${n===1?'':'s'}</div>
+            <div class="tile-value ${avgSurplus>=0?'good':'bad'}">${avgSurplus>=0?'+':''}${fmt(avgSurplus)}</div>
+            <div class="tile-sub">Latest month: ${latest ? escapeHtml(latest.name) : '—'}</div>
           </div>
         </div>
         <div class="card">
@@ -859,7 +928,35 @@
       const lineList = (items) => items.length
         ? items.map(it => `<div class="row"><span class="label">${escapeHtml(it.label || '—')}</span><span>${fmt2(it.amount)}</span></div>`).join('')
         : '<div class="row"><span class="label">— none —</span><span></span></div>';
+      const accSection = (key, title, total, body) => {
+        const isZero = !total || Math.abs(total) < 0.005;
+        const openClass = isZero ? '' : 'open';
+        return `
+          <div class="acc ${openClass} ${isZero?'zero':''}" data-acc="${key}">
+            <button class="acc-head" type="button">
+              <span class="acc-title">${title}</span>
+              <span class="acc-total">${fmt2(total)}</span>
+              <span class="acc-chev">▼</span>
+            </button>
+            <div class="acc-body">${body}</div>
+          </div>`;
+      };
+
       $('#monthly-detail').innerHTML = `
+        <div class="bento">
+          <div class="tile">
+            <div class="tile-label">Income</div>
+            <div class="tile-value good">${fmt(m.income)}</div>
+          </div>
+          <div class="tile">
+            <div class="tile-label">Spending</div>
+            <div class="tile-value">${fmt(m.spendTotal)}</div>
+          </div>
+          <div class="tile span2">
+            <div class="tile-label">Remaining</div>
+            <div class="tile-value ${m.surplus>=0?'good':'bad'}">${m.surplus>=0?'+':''}${fmt(m.surplus)}</div>
+          </div>
+        </div>
         <div class="card">
           <h2>${escapeHtml(m.name)} — split</h2>
           <div class="chart-wrap tall">${svgDoughnut({
@@ -876,24 +973,19 @@
             { label: 'Car', color: CAT_COLORS.car },
           ])}
         </div>
-        <div class="card"><h2>Income</h2>${lineList(m.incomeLines)}
-          <div class="row"><strong>Total</strong><strong>${fmt2(m.income)}</strong></div></div>
-        <div class="card"><h2>Main spending</h2>${lineList(m.mainLines)}
-          <div class="row"><strong>Total</strong><strong>${fmt2(m.main)}</strong></div></div>
-        <div class="card"><h2>Optional</h2>${lineList(m.optionalLines)}
-          <div class="row"><strong>Total</strong><strong>${fmt2(m.optional)}</strong></div></div>
-        <div class="card"><h2>Savings</h2>${lineList(m.savingsLines)}
-          <div class="row"><strong>Total</strong><strong>${fmt2(m.savings)}</strong></div></div>
-        ${m.loan > 0 ? `<div class="card"><h2>Debt (Loan)</h2>
-          <div class="row"><span class="label">Monthly debt payment</span><span>${fmt2(m.loan)}</span></div></div>` : ''}
-        ${m.car > 0 ? `<div class="card"><h2>Car</h2>${lineList(m.carLines)}
-          <div class="row"><strong>Total</strong><strong>${fmt2(m.car)}</strong></div></div>` : ''}
-        <div class="card"><h2>Summary</h2>
-          <div class="row"><span class="label">Income</span><span>${fmt2(m.income)}</span></div>
-          <div class="row"><span class="label">Spending</span><span>${fmt2(m.spendTotal)}</span></div>
-          <div class="row"><strong>Remaining</strong><strong style="color:${m.surplus>=0?'var(--good)':'var(--bad)'}">${fmt2(m.surplus)}</strong></div>
-        </div>
+        ${accSection('income',   'Income',        m.income,    lineList(m.incomeLines))}
+        ${accSection('main',     'Main spending', m.main,      lineList(m.mainLines))}
+        ${accSection('optional', 'Optional',      m.optional,  lineList(m.optionalLines))}
+        ${accSection('savings',  'Savings',       m.savings,   lineList(m.savingsLines))}
+        ${m.loan > 0 ? accSection('debt', 'Debt (Loan)', m.loan, `<div class="row"><span class="label">Monthly debt payment</span><span>${fmt2(m.loan)}</span></div>`) : ''}
+        ${m.car  > 0 ? accSection('car',  'Car',         m.car,  lineList(m.carLines)) : ''}
       `;
+
+      $('#monthly-detail').querySelectorAll('.acc-head').forEach(h => {
+        h.addEventListener('click', () => {
+          h.closest('.acc').classList.toggle('open');
+        });
+      });
     }
 
     // ============================================================
@@ -995,23 +1087,40 @@
       const monthLabels = Array.from({length: maxLen}, (_, i) => String(i));
 
       $('#debt-content').innerHTML = `
-        <div class="card">
-          <h2>Debt summary</h2>
-          <div class="stat-grid">
-            <div class="stat"><div class="stat-label">Total balance</div><div class="stat-value">${fmt(totalBal)}</div></div>
-            <div class="stat"><div class="stat-label">Total monthly</div><div class="stat-value">${fmt(totalMin)}</div></div>
-            <div class="stat"><div class="stat-label">Debt-free in</div><div class="stat-value">${withExtra.months} mo</div></div>
-            <div class="stat"><div class="stat-label">Interest saved</div><div class="stat-value ${saved>0?'good':''}">${fmt(saved)}</div></div>
+        <div class="bento">
+          <div class="tile">
+            <div class="tile-label">Total balance</div>
+            <div class="tile-value">${fmt(totalBal)}</div>
+          </div>
+          <div class="tile">
+            <div class="tile-label">Monthly payment</div>
+            <div class="tile-value">${fmt(totalMin)}</div>
+          </div>
+          <div class="tile">
+            <div class="tile-label">Debt-free in</div>
+            <div class="tile-value">${withExtra.months} mo</div>
+            <div class="tile-sub">Baseline ${baseline.months} mo</div>
+          </div>
+          <div class="tile">
+            <div class="tile-label">Interest saved</div>
+            <div class="tile-value ${saved>0?'good':''}">${fmt(saved)}</div>
+            <div class="tile-sub">vs no extra payment</div>
           </div>
         </div>
         <div class="card">
-          <h2>Extra payment (what-if)</h2>
-          <div class="slider-row">
+          <h2>Payoff projection</h2>
+          <div class="chart-wrap short">${svgLineChart({
+            labels: monthLabels,
+            datasets: [
+              { label: 'Baseline', data: baseline.schedule.map(s => s.remaining), color: '#f87171', fill: true },
+              { label: `+${fmt(extra)}/mo`, data: withExtra.schedule.map(s => s.remaining), color: '#4ade80', fill: true },
+            ],
+          })}</div>
+          <div class="slider-row" style="margin-top:10px">
             <input type="range" id="extra-slider" min="0" max="1000" step="10" value="${extra}">
             <div class="val">+${fmt(extra)}/mo</div>
           </div>
-          <div class="legend">Baseline: ${baseline.months} mo · ${fmt(baseline.totalInterest)} interest<br>
-            With extra: ${withExtra.months} mo · ${fmt(withExtra.totalInterest)} interest</div>
+          <div class="legend">Drag the slider to see how an extra monthly payment shortens the payoff and saves interest (what-if only — doesn't write to the sheet).</div>
         </div>
         <div class="card">
           <h2>Debts</h2>
@@ -1028,16 +1137,6 @@
             </tbody>
           </table>
           <div class="legend">Balance &amp; Monthly write to the sheet (Google sign-in required). APR is saved on this device only.</div>
-        </div>
-        <div class="card">
-          <h2>Payoff projection</h2>
-          <div class="chart-wrap short">${svgLineChart({
-            labels: monthLabels,
-            datasets: [
-              { label: 'Baseline', data: baseline.schedule.map(s => s.remaining), color: '#f87171', fill: true },
-              { label: `+${fmt(extra)}/mo`, data: withExtra.schedule.map(s => s.remaining), color: '#4ade80', fill: true },
-            ],
-          })}</div>
         </div>
       `;
       $('#extra-slider').addEventListener('input', (e) => {
